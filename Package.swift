@@ -10,7 +10,7 @@ let package = Package(
             targets: ["SebbuTSDS"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-atomics.git", from: "0.0.2")
+        .package(url: "https://github.com/apple/swift-atomics.git", .branch("main"))
     ],
     targets: [
         .target(
