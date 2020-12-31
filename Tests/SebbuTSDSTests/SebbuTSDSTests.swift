@@ -2,6 +2,7 @@ import XCTest
 import SebbuTSDS
 import Atomics
 import Dispatch
+import Foundation
 
 final class SebbuTSDSTests: XCTestCase {
     private func test<T: ConcurrentQueue>(name: String, queue: T, writers: Int, readers: Int, elements: Int = 10_000) where T.Element == (item: Int, thread: Int) {
@@ -13,7 +14,10 @@ final class SebbuTSDSTests: XCTestCase {
             if i < writers {
                 for index in 0..<elements {
                     let element = (item: index, thread: i)
-                    while !queue.enqueue(element){}
+                    while !queue.enqueue(element) {
+                        // If there are more threads than cores, we should give time for the other threads to read the values
+                        Thread.sleep(forTimeInterval: 0.001)
+                    }
                     accumulatedCount.wrappingIncrement(by: index, ordering: .relaxed)
                 }
                 done.wrappingDecrement(ordering: .relaxed)
@@ -113,7 +117,7 @@ final class SebbuTSDSTests: XCTestCase {
         let lockedQueueAutomaticResize = LockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: true)
         
         // Should probably be based on the amount of cores the test machine has available
-        for i in 2...6 {
+        for i in 2...4 {
             test(name: "LockedQueue", queue: lockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_000)
             test(name: "LockedQueueAutomaticResize", queue: lockedQueueAutomaticResize, writers: i / 2, readers: i / 2, elements: 1_000_000)
             test(name: "LockedQueue", queue: lockedQueue, writers: i - 1, readers: 1, elements: 1_000_000)
