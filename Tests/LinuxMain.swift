@@ -1,7 +1,7 @@
 import XCTest
 
-import sebbu_ts_dsTests
+import SebbuTSDSTests
 
 var tests = [XCTestCaseEntry]()
-tests += sebbu_ts_dsTests.allTests()
+tests += SebbuTSDSTests.allTests()
 XCTMain(tests)
