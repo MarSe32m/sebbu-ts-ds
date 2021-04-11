@@ -21,9 +21,9 @@ jobs:
       run: swift build -v -c release
     # For some reason the tests will hang, for now just run them on the development machine
     - name: Test (Debug)
-      run: swift test -v --configuration debug
+      run: swift test -v --configuration debug --enable-test-discovery
     - name: Test (Release)
-      run: swift test -v --configuration release -Xswiftc -enable-testing
+      run: swift test -v --configuration release --enable-test-discovery -Xswiftc -enable-testing
     
   linux-swift-53:
     name: Linux x86_64 (Swift 5.3)
@@ -40,9 +40,9 @@ jobs:
       run: swift build -v -c release --enable-test-discovery
     # For some reason the tests will hang, for now just run them on the development machine
     - name: Test (Debug)
-      run: swift test -v --configuration debug
+      run: swift test -v --configuration debug --enable-test-discovery
     - name: Test (Release)
-      run: swift test -v --configuration release -Xswiftc -enable-testing
+      run: swift test -v --configuration release --enable-test-discovery -Xswiftc -enable-testing
     
   windows-swift-latest:
     name: Windows (Development Snapshot)
@@ -79,6 +79,6 @@ jobs:
     #  run: swift build -v -c release
     # For some reason the tests will hang, for now just run them on the development machine
     #- name: Test (Debug)
-    #  run: swift test -v --configuration debug
+    #  run: swift test -v --configuration debug --enable-test-discovery
     #- name: Test (Release)
-    #  run: swift test -v --configuration release -Xswiftc -enable-testing
+    #  run: swift test -v --configuration release --enable-test-discovery -Xswiftc -enable-testing
