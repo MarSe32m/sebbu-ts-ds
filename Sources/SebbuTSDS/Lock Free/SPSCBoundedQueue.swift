@@ -10,7 +10,7 @@ import Atomics
 public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
     private let size: Int
     private let mask: Int
-    private var buffer: [Element?]
+    private var buffer: UnsafeMutableBufferPointer<Element?>
     
     private let head = ManagedAtomic<Int>(0)
     private let tail = ManagedAtomic<Int>(0)
@@ -19,7 +19,12 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
         precondition(size >= 2, "Queue capacity too small")
         self.size = size.nextPowerOf2()
         self.mask = size.nextPowerOf2() - 1
-        self.buffer = Array<Element?>(repeating: nil, count: size.nextPowerOf2() + 1)
+        self.buffer = UnsafeMutableBufferPointer.allocate(capacity: size.nextPowerOf2() + 1)
+        self.buffer.initialize(repeating: nil)
+    }
+    
+    deinit {
+        buffer.deallocate()
     }
     
     @discardableResult

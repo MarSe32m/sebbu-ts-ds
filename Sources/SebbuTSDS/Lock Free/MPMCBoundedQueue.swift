@@ -14,7 +14,7 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue {
     
     private let size: Int
     private let mask: Int
-    private var buffer: [BufferNode]
+    private var buffer: UnsafeMutableBufferPointer<BufferNode>
     
     private var head = ManagedAtomic<Int>(0)
     private var tail = ManagedAtomic<Int>(0)
@@ -22,16 +22,17 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue {
     public init(size _size: Int) {
         self.size = _size.nextPowerOf2()
         self.mask = _size.nextPowerOf2() - 1
-        buffer = [BufferNode]()
+        self.buffer = UnsafeMutableBufferPointer.allocate(capacity: _size.nextPowerOf2())
+        self.buffer.initialize(repeating: BufferNode())
         for i in 0..<_size.nextPowerOf2() {
             let node = BufferNode()
             node.sequence.store(i, ordering: .relaxed)
-            buffer.append(node)
+            buffer[i] = node
         }
     }
     
     deinit {
-        buffer.removeAll()
+        buffer.deallocate()
     }
     
     @discardableResult

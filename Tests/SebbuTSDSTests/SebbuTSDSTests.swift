@@ -15,7 +15,6 @@ final class SebbuTSDSTests: XCTestCase {
                 for index in 0..<elements {
                     let element = (item: index, thread: i)
                     while !queue.enqueue(element) {
-                        // If there are more threads than cores, we should give time for the other threads to read the values
                         Thread.sleep(forTimeInterval: 0.001)
                     }
                     accumulatedCount.wrappingIncrement(by: index, ordering: .relaxed)
@@ -26,7 +25,9 @@ final class SebbuTSDSTests: XCTestCase {
                 while done.load(ordering: .relaxed) > 0 {
                     if let element = queue.dequeue() {
                         count.wrappingIncrement(by: element.item, ordering: .relaxed)
+                        continue
                     }
+                    Thread.sleep(forTimeInterval: 0.001)
                 }
                 queue.dequeueAll { (element) in
                     count.wrappingIncrement(by: element.item, ordering: .relaxed)
@@ -41,38 +42,37 @@ final class SebbuTSDSTests: XCTestCase {
 
     func testSPSCBoundedQueue128() {
         let spscBoundedQueue128 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 128)
-        for i in stride(from: 1_00, to: 1_000_000, by: 10000) {
-            test(name: "SPSCBoundedQueue128", queue: spscBoundedQueue128, writers: 1, readers: 1, elements: i)
-        }
+        test(name: "SPSCBoundedQueue128", queue: spscBoundedQueue128, writers: 1, readers: 1, elements: 128)
+        test(name: "SPSCBoundedQueue128", queue: spscBoundedQueue128, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
+        test(name: "SPSCBoundedQueue128", queue: spscBoundedQueue128, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
     }
     
     func testSPSCBoundedQueue1024() {
         let spscBoundedQueue1024 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 1024)
-        for i in stride(from: 1_00, to: 1_000_000, by: 10000) {
-            test(name: "SPSCBoundedQueue1024", queue: spscBoundedQueue1024, writers: 1, readers: 1, elements: i)
-        }
+        test(name: "SPSCBoundedQueue1024", queue: spscBoundedQueue1024, writers: 1, readers: 1, elements: 128)
+        test(name: "SPSCBoundedQueue1024", queue: spscBoundedQueue1024, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
+        test(name: "SPSCBoundedQueue1024", queue: spscBoundedQueue1024, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
     }
     
     func testSPSCBoundedQueue65536() {
         let spscBoundedQueue65536 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 65536)
-        for i in stride(from: 1_00, to: 1_000_000, by: 10000) {
-            test(name: "SPSCBoundedQueue65536", queue: spscBoundedQueue65536, writers: 1, readers: 1, elements: i)
-        }
+        test(name: "SPSCBoundedQueue65536", queue: spscBoundedQueue65536, writers: 1, readers: 1, elements: 128)
+        test(name: "SPSCBoundedQueue65536", queue: spscBoundedQueue65536, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
+        test(name: "SPSCBoundedQueue65536", queue: spscBoundedQueue65536, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
     }
     
     func testSPSCBoundedQueue1000000() {
         let spscBoundedQueue1000000 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 1_000_000)
-        for i in stride(from: 1_00, to: 1_000_000, by: 10000) {
-            test(name: "SPSCBoundedQueue1000000", queue: spscBoundedQueue1000000, writers: 1, readers: 1, elements: i)
-        }
+        test(name: "SPSCBoundedQueue1000000", queue: spscBoundedQueue1000000, writers: 1, readers: 1, elements: 128)
+        test(name: "SPSCBoundedQueue1000000", queue: spscBoundedQueue1000000, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
+        test(name: "SPSCBoundedQueue1000000", queue: spscBoundedQueue1000000, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
     }
     
     func testSPSCQueue() {
         let spscQueue = SPSCQueue<(item: Int, thread: Int)>()
-        for i in stride(from: 1_00, to: 1_000_000, by: 10000) {
-            test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: i)
-        }
-        
+        test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: 128)
+        test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
+        test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
     }
     
     func testMPMCBoundedQueue128() {
@@ -175,18 +175,4 @@ final class SebbuTSDSTests: XCTestCase {
             XCTAssertNil(lockedQueueAutomaticResize.dequeue())
         }
     }
-    
-    static var allTests = [
-        ("testDeinit", testDraining),
-        ("testSPSCBoundedQueue128", testSPSCBoundedQueue128),
-        ("testSPSCBoundedQueue1024", testSPSCBoundedQueue1024),
-        ("testSPSCBoundedQueue65536", testSPSCBoundedQueue65536),
-        ("testSPSCBoundedQueue1000000", testSPSCBoundedQueue1000000),
-        ("testSPSCQueue", testSPSCQueue),
-        ("testMPMCBoundedQueue128", testMPMCBoundedQueue128),
-        ("testMPMCBoundedQueue1024", testMPMCBoundedQueue1024),
-        ("testMPMCBoundedQueue65536", testMPMCBoundedQueue65536),
-        ("testMPSCQueue", testMPSCQueue),
-        ("testLockedQueue", testLockedQueue)
-    ]
 }
