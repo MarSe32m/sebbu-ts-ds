@@ -13,7 +13,7 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     internal let lock = NSLock()
     
     @usableFromInline
-    internal var backingArray = [Element?]()
+    internal var buffer: UnsafeMutableBufferPointer<Element?>
     
     @usableFromInline
     internal var headIndex = 0
@@ -24,6 +24,7 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     @usableFromInline
     internal var _resizeAutomatically: ManagedAtomic<Bool>
     
+    @inline(__always)
     public var resizeAutomatically: Bool {
         get {
             return _resizeAutomatically.load(ordering: .relaxed)
@@ -35,16 +36,17 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     
     @inlinable
     internal var mask: Int {
-        return self.backingArray.count &- 1
+        return self.buffer.count &- 1
     }
     
     public init(size: Int, resizeAutomatically: Bool = false) {
-        backingArray = Array<Element?>(repeating: nil, count: size.nextPowerOf2())
+        buffer = UnsafeMutableBufferPointer.allocate(capacity: size.nextPowerOf2())
+        buffer.initialize(repeating: nil)
         _resizeAutomatically = ManagedAtomic<Bool>(resizeAutomatically)
     }
     
     deinit {
-        backingArray.removeAll()
+        buffer.deallocate()
     }
     
     /// Enqueues an item at the end of the queue
@@ -59,7 +61,7 @@ public final class LockedQueue<Element>: ConcurrentQueue {
                 return false
             }
         }
-        backingArray[tailIndex] = value
+        buffer[tailIndex] = value
         tailIndex = (tailIndex + 1) & self.mask
         return true
     }
@@ -70,7 +72,7 @@ public final class LockedQueue<Element>: ConcurrentQueue {
         lock.lock(); defer { lock.unlock() }
         if headIndex == tailIndex { return nil }
         defer { headIndex = (headIndex + 1) & self.mask }
-        return backingArray[headIndex]
+        return buffer[headIndex]
     }
     
     /// Dequeues all of the elements
@@ -96,11 +98,31 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     public func resize(to newSize: Int) {
         lock.lock(); defer { lock.unlock() }
         let size = newSize.nextPowerOf2()
-        backingArray = Array<Element?>(repeating: nil, count: size)
+        buffer.deallocate()
+        buffer = UnsafeMutableBufferPointer.allocate(capacity: size)
+        buffer.initialize(repeating: nil)
     }
     
     /// Doubles the queue size
     @inlinable
+    internal func _grow() {
+        let nextSize = max(buffer.count, (buffer.count + 1).nextPowerOf2())
+        var newBuffer = UnsafeMutableBufferPointer<Element?>.allocate(capacity: nextSize)
+        newBuffer.initialize(repeating: nil)
+        let oldMask = self.mask
+        
+        for index in 0..<buffer.count {
+            newBuffer[index] = buffer[(index + headIndex) & oldMask]
+        }
+        
+        tailIndex = buffer.count - 1
+        headIndex = 0
+        swap(&buffer, &newBuffer)
+        newBuffer.deallocate()
+    }
+    
+    /// Doubles the queue size
+    /*@inlinable
     internal func _grow() {
         let nextSize = max(backingArray.count, (backingArray.count + 1).nextPowerOf2())
         let copy = backingArray
@@ -113,5 +135,6 @@ public final class LockedQueue<Element>: ConcurrentQueue {
         tailIndex = copy.count - 1
         headIndex = 0
     }
+     */
 }
 
