@@ -8,18 +8,28 @@
 import Atomics
 
 public final class MPSCQueue<Element>: ConcurrentQueue {
-    struct BufferNode {
-        var data: Element?
-        let next: UnsafeAtomic<UnsafeMutablePointer<BufferNode>?> = UnsafeAtomic.create(nil)
+    @usableFromInline
+    internal struct BufferNode {
         
-        init(data: Element?) {
+        @usableFromInline
+        internal var data: Element?
+        
+        @usableFromInline
+        internal let next: UnsafeAtomic<UnsafeMutablePointer<BufferNode>?> = UnsafeAtomic.create(nil)
+        
+        @usableFromInline
+        internal init(data: Element?) {
             self.data = data
         }
     }
     
-    private var head: ManagedAtomic<UnsafeMutablePointer<BufferNode>>
-    private var tail: ManagedAtomic<UnsafeMutablePointer<BufferNode>>
+    @usableFromInline
+    internal var head: ManagedAtomic<UnsafeMutablePointer<BufferNode>>
     
+    @usableFromInline
+    internal var tail: ManagedAtomic<UnsafeMutablePointer<BufferNode>>
+    
+    @inlinable
     public init() {
         let node = UnsafeMutablePointer<BufferNode>.allocate(capacity: 1)
         node.initialize(to: BufferNode(data: nil))
@@ -33,6 +43,7 @@ public final class MPSCQueue<Element>: ConcurrentQueue {
     }
     
     @discardableResult
+    @inlinable
     public final func enqueue(_ value: Element) -> Bool {
         let bufferNode = UnsafeMutablePointer<BufferNode>.allocate(capacity: 1)
         bufferNode.initialize(to: BufferNode(data: value))
@@ -42,6 +53,7 @@ public final class MPSCQueue<Element>: ConcurrentQueue {
         return true
     }
     
+    @inlinable
     public final func dequeue() -> Element? {
         let currentHead = head.load(ordering: .relaxed)
         guard let next = currentHead.pointee.next.load(ordering: .acquiring) else {
@@ -54,6 +66,7 @@ public final class MPSCQueue<Element>: ConcurrentQueue {
         return result
     }
     
+    @inline(__always)
     public final func dequeueAll(_ closure: (Element) -> Void) {
         while let element = dequeue() {
             closure(element)

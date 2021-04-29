@@ -8,17 +8,26 @@
 import Atomics
 
 public final class SPSCQueue<Element>: ConcurrentQueue {
-    struct Node {
-        var next: UnsafeMutablePointer<Node>?
-        var data: Element?
+    @usableFromInline
+    internal struct Node {
         
+        @usableFromInline
+        internal var next: UnsafeMutablePointer<Node>?
+        
+        @usableFromInline
+        internal var data: Element?
+        
+        @usableFromInline
         init(data: Element?) {
             self.data = data
         }
     }
     
-    private var head: UnsafeMutablePointer<Node>
-    private var tail: UnsafeMutablePointer<Node>
+    @usableFromInline
+    internal var head: UnsafeMutablePointer<Node>
+    
+    @usableFromInline
+    internal var tail: UnsafeMutablePointer<Node>
     
     public init() {
         head = UnsafeMutablePointer<Node>.allocate(capacity: 1)
@@ -32,6 +41,7 @@ public final class SPSCQueue<Element>: ConcurrentQueue {
     }
     
     @discardableResult
+    @inlinable
     public final func enqueue(_ value: Element) -> Bool {
         let node = UnsafeMutablePointer<Node>.allocate(capacity: 1)
         node.initialize(to: Node(data: value))
@@ -42,6 +52,7 @@ public final class SPSCQueue<Element>: ConcurrentQueue {
         return true
     }
     
+    @inlinable
     public final func dequeue() -> Element? {
         atomicMemoryFence(ordering: .acquiring)
         if head.pointee.next == nil {
@@ -55,6 +66,7 @@ public final class SPSCQueue<Element>: ConcurrentQueue {
         return result
     }
     
+    @inline(__always)
     public final func dequeueAll(_ closure: (Element) -> Void) {
         while let element = dequeue() {
             closure(element)

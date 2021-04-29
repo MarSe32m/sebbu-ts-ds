@@ -8,12 +8,21 @@
 import Atomics
 
 public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
-    private let size: Int
-    private let mask: Int
-    private var buffer: UnsafeMutableBufferPointer<Element?>
     
-    private let head = ManagedAtomic<Int>(0)
-    private let tail = ManagedAtomic<Int>(0)
+    @usableFromInline
+    internal let size: Int
+    
+    @usableFromInline
+    internal let mask: Int
+    
+    @usableFromInline
+    internal var buffer: UnsafeMutableBufferPointer<Element?>
+    
+    @usableFromInline
+    internal let head = ManagedAtomic<Int>(0)
+    
+    @usableFromInline
+    internal let tail = ManagedAtomic<Int>(0)
     
     public init(size: Int) {
         precondition(size >= 2, "Queue capacity too small")
@@ -28,6 +37,7 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
     }
     
     @discardableResult
+    @inlinable
     public final func enqueue(_ value: Element) -> Bool {
         let pos = tail.load(ordering: .relaxed)
         
@@ -39,6 +49,7 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
         return false
     }
     
+    @inlinable
     public final func dequeue() -> Element? {
         let pos = head.load(ordering: .relaxed)
         
@@ -51,6 +62,7 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
         return nil
     }
     
+    @inline(__always)
     public final func dequeueAll(_ closure: (Element) -> Void) {
         while let element = dequeue() {
             closure(element)

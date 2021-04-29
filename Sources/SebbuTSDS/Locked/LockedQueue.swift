@@ -76,7 +76,7 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     }
     
     /// Dequeues all of the elements
-    @inlinable
+    @inline(__always)
     public func dequeueAll(_ closure: (Element) -> Void) {
         while let element = dequeue() {
             closure(element)

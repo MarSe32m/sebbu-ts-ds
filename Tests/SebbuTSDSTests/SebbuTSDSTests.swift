@@ -140,7 +140,7 @@ final class SebbuTSDSTests: XCTestCase {
             let lockedQueue = LockedQueue<(item: Int, thread: Int)>(size: 10000, resizeAutomatically: false)
             let lockedQueueAutomaticResize = LockedQueue<(item: Int, thread: Int)>(size: 10000, resizeAutomatically: true)
             
-            for i in 0..<100 {
+            for i in 0..<1_000_000 {
                 spscBoundedQueue128.enqueue((item: i, thread: 0))
                 spscBoundedQueue1024.enqueue((item: i, thread: 0))
                 spscBoundedQueue65536.enqueue((item: i, thread: 0))

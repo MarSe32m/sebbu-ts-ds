@@ -7,17 +7,31 @@
 import Atomics
 
 public final class MPMCBoundedQueue<Element>: ConcurrentQueue {
-    private class BufferNode {
-        var data: Element?
-        let sequence: ManagedAtomic<Int> = ManagedAtomic<Int>(0)
+    
+    @usableFromInline
+    internal class BufferNode {
+        
+        @usableFromInline
+        internal var data: Element?
+        
+        @usableFromInline
+        internal let sequence: ManagedAtomic<Int> = ManagedAtomic<Int>(0)
     }
     
-    private let size: Int
-    private let mask: Int
-    private var buffer: UnsafeMutableBufferPointer<BufferNode>
+    @usableFromInline
+    internal let size: Int
     
-    private var head = ManagedAtomic<Int>(0)
-    private var tail = ManagedAtomic<Int>(0)
+    @usableFromInline
+    internal let mask: Int
+    
+    @usableFromInline
+    internal var buffer: UnsafeMutableBufferPointer<BufferNode>
+    
+    @usableFromInline
+    internal var head = ManagedAtomic<Int>(0)
+    
+    @usableFromInline
+    internal var tail = ManagedAtomic<Int>(0)
     
     public init(size _size: Int) {
         self.size = _size.nextPowerOf2()
@@ -36,6 +50,7 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue {
     }
     
     @discardableResult
+    @inlinable
     public final func enqueue(_ value: Element) -> Bool {
         var node: BufferNode!
         var pos = tail.load(ordering: .relaxed)
@@ -46,7 +61,10 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue {
             let difference = seq - pos
             
             if difference == 0 {
-                if tail.weakCompareExchange(expected: pos, desired: pos + 1, successOrdering: .relaxed, failureOrdering: .relaxed).exchanged {
+                if tail.weakCompareExchange(expected: pos,
+                                            desired: pos + 1,
+                                            successOrdering: .relaxed,
+                                            failureOrdering: .relaxed).exchanged {
                     break
                 }
             } else if difference < 0 {
@@ -61,6 +79,7 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue {
         return true
     }
     
+    @inlinable
     public final func dequeue() -> Element? {
         var node: BufferNode!
         var pos = head.load(ordering: .relaxed)
@@ -86,6 +105,7 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue {
         return node.data
     }
     
+    @inline(__always)
     public final func dequeueAll(_ closure: (Element) -> Void) {
         while let element = dequeue() {
             closure(element)
