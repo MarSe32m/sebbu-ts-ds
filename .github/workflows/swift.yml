@@ -19,7 +19,6 @@ jobs:
       run: swift build -v -c debug
     - name: Build (Release)
       run: swift build -v -c release
-    # For some reason the tests will hang, for now just run them on the development machine
     - name: Test (Debug)
       run: swift test -v --configuration debug --enable-test-discovery
     - name: Test (Release)
@@ -38,7 +37,6 @@ jobs:
       run: swift build -v -c debug --enable-test-discovery
     - name: Build (Release)
       run: swift build -v -c release --enable-test-discovery
-    # For some reason the tests will hang, for now just run them on the development machine
     - name: Test (Debug)
       run: swift test -v --configuration debug --enable-test-discovery
     - name: Test (Release)
