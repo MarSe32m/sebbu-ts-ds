@@ -14,9 +14,7 @@ final class SebbuTSDSTests: XCTestCase {
             if i < writers {
                 for index in 0..<elements {
                     let element = (item: index, thread: i)
-                    while !queue.enqueue(element) {
-                        Thread.sleep(forTimeInterval: 0.001)
-                    }
+                    while !queue.enqueue(element) {}
                     accumulatedCount.wrappingIncrement(by: index, ordering: .relaxed)
                 }
                 done.wrappingDecrement(ordering: .relaxed)
@@ -27,7 +25,6 @@ final class SebbuTSDSTests: XCTestCase {
                         count.wrappingIncrement(by: element.item, ordering: .relaxed)
                         continue
                     }
-                    Thread.sleep(forTimeInterval: 0.001)
                 }
                 queue.dequeueAll { (element) in
                     count.wrappingIncrement(by: element.item, ordering: .relaxed)
@@ -77,7 +74,7 @@ final class SebbuTSDSTests: XCTestCase {
     
     func testMPMCBoundedQueue128() {
         let mpmcBoundedQueue128 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 128)
-        for i in 2...6 {
+        for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "MPMCBoundedQueue128", queue: mpmcBoundedQueue128, writers: i / 2, readers: i / 2, elements: 1_000_00)
             test(name: "MPMCBoundedQueue128", queue: mpmcBoundedQueue128, writers: i / 2, readers: i - i / 2, elements: 1_000_00)
             test(name: "MPMCBoundedQueue128", queue: mpmcBoundedQueue128, writers: i - i / 2, readers: i / 2, elements: 1_000_00)
@@ -87,7 +84,7 @@ final class SebbuTSDSTests: XCTestCase {
     
     func testMPMCBoundedQueue1024() {
         let mpmcBoundedQueue1024 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 1024)
-        for i in 2...6 {
+        for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "MPMCBoundedQueue1024", queue: mpmcBoundedQueue1024, writers: i / 2, readers: i / 2, elements: 1_000_00)
             test(name: "MPMCBoundedQueue1024", queue: mpmcBoundedQueue1024, writers: i / 2, readers: i - i / 2, elements: 1_000_00)
             test(name: "MPMCBoundedQueue1024", queue: mpmcBoundedQueue1024, writers: i - i / 2, readers: i / 2, elements: 1_000_00)
@@ -97,7 +94,7 @@ final class SebbuTSDSTests: XCTestCase {
     
     func testMPMCBoundedQueue65536() {
         let mpmcBoundedQueue65536 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 65536)
-        for i in 2...6 {
+        for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "MPMCBoundedQueue65536", queue: mpmcBoundedQueue65536, writers: i / 2, readers: i / 2, elements: 1_000_00)
             test(name: "MPMCBoundedQueue65536", queue: mpmcBoundedQueue65536, writers: i / 2, readers: i - i / 2, elements: 1_000_00)
             test(name: "MPMCBoundedQueue65536", queue: mpmcBoundedQueue65536, writers: i - i / 2, readers: i / 2, elements: 1_000_00)
@@ -107,7 +104,7 @@ final class SebbuTSDSTests: XCTestCase {
     
     func testMPSCQueue() {
         let mpscQueue = MPSCQueue<(item: Int, thread: Int)>()
-        for i in 2...6 {
+        for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "MPSCQueue", queue: mpscQueue, writers: i - 1, readers: 1, elements: 1_000_00)
         }
     }
@@ -117,7 +114,7 @@ final class SebbuTSDSTests: XCTestCase {
         let lockedQueueAutomaticResize = LockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: true)
         
         // Should probably be based on the amount of cores the test machine has available
-        for i in 2...4 {
+        for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "LockedQueue", queue: lockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_000)
             test(name: "LockedQueueAutomaticResize", queue: lockedQueueAutomaticResize, writers: i / 2, readers: i / 2, elements: 1_000_000)
             test(name: "LockedQueue", queue: lockedQueue, writers: i - 1, readers: 1, elements: 1_000_000)
