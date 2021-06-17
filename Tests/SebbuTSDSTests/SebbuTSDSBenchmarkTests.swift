@@ -12,6 +12,9 @@ import Atomics
 
 final class SebbuTSDSBenchamrkTests: XCTestCase {
     func testSPSCBoundedQueueRoundTrip128() {
+        var isDebug = false
+        assert({isDebug = true; return isDebug}())
+        if isDebug { return }
         let queue = SPSCBoundedQueue<Int>(size: 128)
         let canProduce = ManagedAtomic<Bool>(true)
         Thread.detachNewThread {
@@ -37,6 +40,9 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
     }
     
     func testSPSCBoundedQueueRoundTrip1024() {
+        var isDebug = false
+        assert({isDebug = true; return isDebug}())
+        if isDebug { return }
         let queue = SPSCBoundedQueue<Int>(size: 1024)
         let canProduce = ManagedAtomic<Bool>(true)
         Thread.detachNewThread {
@@ -62,6 +68,9 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
     }
     
     func testSPSCBoundedQueueRoundTrip65536() {
+        var isDebug = false
+        assert({isDebug = true; return isDebug}())
+        if isDebug { return }
         let queue = SPSCBoundedQueue<Int>(size: 65536)
         let canProduce = ManagedAtomic<Bool>(true)
         Thread.detachNewThread {
@@ -87,6 +96,9 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
     }
     
     func testSPSCBoundedQueueRoundTrip1000000() {
+        var isDebug = false
+        assert({isDebug = true; return isDebug}())
+        if isDebug { return }
         let queue = SPSCBoundedQueue<Int>(size: 1000000)
         let canProduce = ManagedAtomic<Bool>(true)
         Thread.detachNewThread {
@@ -112,6 +124,9 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
     }
     
     func testSPSCQueueRoundTrip() {
+        var isDebug = false
+        assert({isDebug = true; return isDebug}())
+        if isDebug { return }
         let queue = SPSCQueue<Int>()
         let canProduce = ManagedAtomic<Bool>(true)
         Thread.detachNewThread {
@@ -137,6 +152,9 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
     }
     
     func testLockedQueueRoundTrip() {
+        var isDebug = false
+        assert({isDebug = true; return isDebug}())
+        if isDebug { return }
         let queue = LockedQueue<Int>(size: 1024, resizeAutomatically: false)
         let canProduce = ManagedAtomic<Bool>(true)
         Thread.detachNewThread {
@@ -162,6 +180,9 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
     }
     
     func testMPMCBoundedQueueRoundTrip() {
+        var isDebug = false
+        assert({isDebug = true; return isDebug}())
+        if isDebug { return }
         let queue = MPMCBoundedQueue<Int>(size: 1024)
         let canProduce = ManagedAtomic<Bool>(true)
         Thread.detachNewThread {
@@ -187,6 +208,9 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
     }
     
     func testMPSCQueueRoundTrip() {
+        var isDebug = false
+        assert({isDebug = true; return isDebug}())
+        if isDebug { return }
         let queue = MPSCQueue<Int>()
         let canProduce = ManagedAtomic<Bool>(true)
         Thread.detachNewThread {
