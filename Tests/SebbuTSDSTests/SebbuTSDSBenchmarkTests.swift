@@ -20,7 +20,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         Thread.detachNewThread {
             while true {
                 canProduce.store(false, ordering: .sequentiallyConsistent)
-                for i in 0 ... 1_000_000 {
+                for i in 0 ... 1_000 {
                     while !queue.enqueue(i) {}
                 }
                 while !canProduce.load(ordering: .sequentiallyConsistent) {}
@@ -30,7 +30,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         measure {
             while true {
                 if let value = queue.dequeue() {
-                    if value == 1_000_000 {
+                    if value == 1_000 {
                         break
                     }
                 }
@@ -48,7 +48,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         Thread.detachNewThread {
             while true {
                 canProduce.store(false, ordering: .sequentiallyConsistent)
-                for i in 0 ... 1_000_000 {
+                for i in 0 ... 1_000 {
                     while !queue.enqueue(i) {}
                 }
                 while !canProduce.load(ordering: .sequentiallyConsistent) {}
@@ -58,7 +58,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         measure {
             while true {
                 if let value = queue.dequeue() {
-                    if value == 1_000_000 {
+                    if value == 1_000 {
                         break
                     }
                 }
@@ -76,7 +76,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         Thread.detachNewThread {
             while true {
                 canProduce.store(false, ordering: .sequentiallyConsistent)
-                for i in 0 ... 1_000_000 {
+                for i in 0 ... 1_000 {
                     while !queue.enqueue(i) {}
                 }
                 while !canProduce.load(ordering: .sequentiallyConsistent) {}
@@ -86,35 +86,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         measure {
             while true {
                 if let value = queue.dequeue() {
-                    if value == 1_000_000 {
-                        break
-                    }
-                }
-            }
-            canProduce.store(true, ordering: .sequentiallyConsistent)
-        }
-    }
-    
-    func testSPSCBoundedQueueRoundTrip1000000() {
-        var isDebug = false
-        assert({isDebug = true; return isDebug}())
-        if isDebug { return }
-        let queue = SPSCBoundedQueue<Int>(size: 1000000)
-        let canProduce = ManagedAtomic<Bool>(true)
-        Thread.detachNewThread {
-            while true {
-                canProduce.store(false, ordering: .sequentiallyConsistent)
-                for i in 0 ... 1_000_000 {
-                    while !queue.enqueue(i) {}
-                }
-                while !canProduce.load(ordering: .sequentiallyConsistent) {}
-            }
-        }
-        
-        measure {
-            while true {
-                if let value = queue.dequeue() {
-                    if value == 1_000_000 {
+                    if value == 1_000 {
                         break
                     }
                 }
@@ -132,7 +104,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         Thread.detachNewThread {
             while true {
                 canProduce.store(false, ordering: .sequentiallyConsistent)
-                for i in 0 ... 1_000_000 {
+                for i in 0 ... 1_000 {
                     while !queue.enqueue(i) {}
                 }
                 while !canProduce.load(ordering: .sequentiallyConsistent) {}
@@ -142,7 +114,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         measure {
             while true {
                 if let value = queue.dequeue() {
-                    if value == 1_000_000 {
+                    if value == 1_000 {
                         break
                     }
                 }
@@ -160,7 +132,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         Thread.detachNewThread {
             while true {
                 canProduce.store(false, ordering: .sequentiallyConsistent)
-                for i in 0 ... 1_000_000 {
+                for i in 0 ... 1_000 {
                     while !queue.enqueue(i) {}
                 }
                 while !canProduce.load(ordering: .sequentiallyConsistent) {}
@@ -170,7 +142,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         measure {
             while true {
                 if let value = queue.dequeue() {
-                    if value == 1_000_000 {
+                    if value == 1_000 {
                         break
                     }
                 }
@@ -188,7 +160,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         Thread.detachNewThread {
             while true {
                 canProduce.store(false, ordering: .sequentiallyConsistent)
-                for i in 0 ... 1_000_000 {
+                for i in 0 ... 1_000 {
                     while !queue.enqueue(i) {}
                 }
                 while !canProduce.load(ordering: .sequentiallyConsistent) {}
@@ -198,7 +170,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         measure {
             while true {
                 if let value = queue.dequeue() {
-                    if value == 1_000_000 {
+                    if value == 1_000 {
                         break
                     }
                 }
@@ -216,7 +188,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         Thread.detachNewThread {
             while true {
                 canProduce.store(false, ordering: .sequentiallyConsistent)
-                for i in 0 ... 1_000_000 {
+                for i in 0 ... 1_000 {
                     while !queue.enqueue(i) {}
                 }
                 while !canProduce.load(ordering: .sequentiallyConsistent) {}
@@ -226,7 +198,7 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         measure {
             while true {
                 if let value = queue.dequeue() {
-                    if value == 1_000_000 {
+                    if value == 1_000 {
                         break
                     }
                 }
