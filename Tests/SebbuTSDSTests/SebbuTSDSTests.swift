@@ -155,6 +155,7 @@ final class SebbuTSDSTests: XCTestCase {
     }
     
     func testDraining() {
+#if canImport(Atomics)
         do {
             let spscBoundedQueue128 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 128)
             let spscBoundedQueue1024 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 1024)
@@ -166,8 +167,6 @@ final class SebbuTSDSTests: XCTestCase {
             let mpmcBoundedQueue65536 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 65536)
             
             let mpscQueue = MPSCQueue<(item: Int, thread: Int)>()
-            let lockedQueue = LockedQueue<(item: Int, thread: Int)>(size: 10000, resizeAutomatically: false)
-            let lockedQueueAutomaticResize = LockedQueue<(item: Int, thread: Int)>(size: 10000, resizeAutomatically: true)
             
             for i in 0..<1_000_000 {
                 spscBoundedQueue128.enqueue((item: i, thread: 0))
@@ -178,8 +177,7 @@ final class SebbuTSDSTests: XCTestCase {
                 mpmcBoundedQueue1024.enqueue((item: i, thread: 0))
                 mpmcBoundedQueue65536.enqueue((item: i, thread: 0))
                 mpscQueue.enqueue((item: i, thread: 0))
-                lockedQueue.enqueue((item: i, thread: 0))
-                lockedQueueAutomaticResize.enqueue((item: i, thread: 0))
+                
             }
             spscBoundedQueue128.dequeueAll { _ in }
             spscBoundedQueue1024.dequeueAll { _ in }
@@ -189,8 +187,6 @@ final class SebbuTSDSTests: XCTestCase {
             mpmcBoundedQueue1024.dequeueAll { _ in }
             mpmcBoundedQueue65536.dequeueAll { _ in }
             mpscQueue.dequeueAll { _ in }
-            lockedQueue.dequeueAll { _ in }
-            lockedQueueAutomaticResize.dequeueAll { _ in }
             
             XCTAssertNil(spscBoundedQueue128.dequeue())
             XCTAssertNil(spscBoundedQueue1024.dequeue())
@@ -200,8 +196,24 @@ final class SebbuTSDSTests: XCTestCase {
             XCTAssertNil(mpmcBoundedQueue1024.dequeue())
             XCTAssertNil(mpmcBoundedQueue65536.dequeue())
             XCTAssertNil(mpscQueue.dequeue())
-            XCTAssertNil(lockedQueue.dequeue())
-            XCTAssertNil(lockedQueueAutomaticResize.dequeue())
         }
+#endif
+        
+        let lockedQueue = LockedQueue<(item: Int, thread: Int)>(size: 10000, resizeAutomatically: false)
+        let lockedQueueAutomaticResize = LockedQueue<(item: Int, thread: Int)>(size: 10000, resizeAutomatically: true)
+        
+        
+        for i in 0..<1000000 {
+            lockedQueue.enqueue((item: i, thread: 0))
+            lockedQueueAutomaticResize.enqueue((item: i, thread: 0))
+        }
+        
+        lockedQueue.dequeueAll { _ in }
+        lockedQueueAutomaticResize.dequeueAll { _ in }
+        
+        
+        XCTAssertNil(lockedQueue.dequeue())
+        XCTAssertNil(lockedQueueAutomaticResize.dequeue())
+        
     }
 }
