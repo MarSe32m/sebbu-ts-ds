@@ -146,7 +146,9 @@ final class SebbuTSDSTests: XCTestCase {
         let lockedQueueAutomaticResize = LockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: true)
         
         // Should probably be based on the amount of cores the test machine has available
-        for i in 2...ProcessInfo.processInfo.processorCount {
+        let count = ProcessInfo.processInfo.processorCount >= 2 ? ProcessInfo.processInfo.processorCount : 2
+        
+        for i in 2...count {
             test(name: "LockedQueue", queue: lockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_000)
             test(name: "LockedQueueAutomaticResize", queue: lockedQueueAutomaticResize, writers: i / 2, readers: i / 2, elements: 1_000_000)
             test(name: "LockedQueue", queue: lockedQueue, writers: i - 1, readers: 1, elements: 1_000_000)
