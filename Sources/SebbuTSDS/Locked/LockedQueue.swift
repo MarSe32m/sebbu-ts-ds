@@ -55,9 +55,13 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     
     /// Enqueues an item at the end of the queue
     @discardableResult
-    @inlinable
     public func enqueue(_ value: Element) -> Bool {
         lock.lock(); defer { lock.unlock() }
+        return _enqueue(value)
+    }
+    
+    @inline(__always)
+    internal func _enqueue(_ value: Element) -> Bool {
         if (tailIndex + 1) & self.mask == headIndex {
             if _resizeAutomatically {
                 _grow()
@@ -71,9 +75,13 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     }
     
     /// Dequeues the next element in the queue if there are any
-    @inlinable
     public func dequeue() -> Element? {
         lock.lock(); defer { lock.unlock() }
+        return _dequeue()
+    }
+    
+    @inline(__always)
+    internal func _dequeue() -> Element? {
         if headIndex == tailIndex { return nil }
         defer {
             buffer[headIndex] = nil
@@ -91,13 +99,27 @@ public final class LockedQueue<Element>: ConcurrentQueue {
         //TODO: Maybe an option for this type of dequeueing?
         /*
         lock.lock(); defer { lock.unlock() }
-        let mask = self.mask
-        while headIndex != tailIndex {
-            closure(backingArray[headIndex]!)
-            headIndex = (headIndex + 1) & mask
+        while let element = _dequeue() {
+            closure(element)
         }
-        headIndex = tailIndex
         */
+    }
+    
+    /// Removes all the elements specified by the given predicate. This will aquire the lock for the whole duration of the removal.
+    public func removeAll(where predicate: (Element) -> Bool) {
+        lock.lock(); defer { lock.unlock() }
+        var notRemoved = [Element]()
+        while let element = _dequeue() {
+            if !predicate(element) {
+                notRemoved.append(element)
+            }
+        }
+        for element in notRemoved {
+            let enqueued = _enqueue(element)
+            // This should always be true, because either we have the same amount of elements as we started with
+            // or we removed some so the queue can't be full
+            assert(enqueued)
+        }
     }
     
     /// Empties the queue and resizes the queue to a new size

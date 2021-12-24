@@ -149,10 +149,10 @@ final class SebbuTSDSTests: XCTestCase {
         let count = ProcessInfo.processInfo.processorCount >= 2 ? ProcessInfo.processInfo.processorCount : 2
         
         for i in 2...count {
-            test(name: "LockedQueue", queue: lockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_000)
-            test(name: "LockedQueueAutomaticResize", queue: lockedQueueAutomaticResize, writers: i / 2, readers: i / 2, elements: 1_000_000)
-            test(name: "LockedQueue", queue: lockedQueue, writers: i - 1, readers: 1, elements: 1_000_000)
-            test(name: "LockedQueueAutomaticResize", queue: lockedQueueAutomaticResize, writers: i - 1, readers: 1, elements: 1_000_000)
+            test(name: "LockedQueue", queue: lockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_00)
+            test(name: "LockedQueueAutomaticResize", queue: lockedQueueAutomaticResize, writers: i / 2, readers: i / 2, elements: 1_000_00)
+            test(name: "LockedQueue", queue: lockedQueue, writers: i - 1, readers: 1, elements: 1_000_00)
+            test(name: "LockedQueueAutomaticResize", queue: lockedQueueAutomaticResize, writers: i - 1, readers: 1, elements: 1_000_00)
         }
     }
     
