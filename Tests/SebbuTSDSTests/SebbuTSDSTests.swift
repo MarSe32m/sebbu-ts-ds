@@ -1,78 +1,103 @@
 import XCTest
 import SebbuTSDS
-import Atomics
 import Dispatch
 import Foundation
-
+#if canImport(Atomics)
+import Atomics
+#endif
 final class SebbuTSDSTests: XCTestCase {
     private func test<T: ConcurrentQueue>(name: String, queue: T, writers: Int, readers: Int, elements: Int = 10_000) where T.Element == (item: Int, thread: Int) {
         let threadCount = writers + readers
-        let count = ManagedAtomic<Int>(0)
-        let done = ManagedAtomic<Int>(writers)
-        let accumulatedCount = ManagedAtomic<Int>(0)
+        let countLock = NSLock()
+        var count = 0
+        var done = writers
+        var accumulatedCount = 0
         DispatchQueue.concurrentPerform(iterations: threadCount) { i in
             if i < writers {
                 for index in 0..<elements {
                     let element = (item: index, thread: i)
                     while !queue.enqueue(element) {}
-                    accumulatedCount.wrappingIncrement(by: index, ordering: .relaxed)
+                    countLock.lock()
+                    accumulatedCount &+= index
+                    countLock.unlock()
                 }
-                done.wrappingDecrement(ordering: .relaxed)
+                countLock.lock()
+                done &-= 1
+                countLock.unlock()
             }
             if i >= writers {
-                while done.load(ordering: .relaxed) > 0 {
+                while true {
+                    countLock.lock()
+                    let isDone = done <= 0
+                    countLock.unlock()
+                    if isDone { break }
                     if let element = queue.dequeue() {
-                        count.wrappingIncrement(by: element.item, ordering: .relaxed)
+                        countLock.lock()
+                        count &+= element.item
+                        countLock.unlock()
                         continue
                     }
                 }
                 queue.dequeueAll { (element) in
-                    count.wrappingIncrement(by: element.item, ordering: .relaxed)
+                    countLock.lock()
+                    count &+= element.item
+                    countLock.unlock()
                 }
             }
         }
-        let finalCount = count.load(ordering: .sequentiallyConsistent)
-        let finalAccumulated = accumulatedCount.load(ordering: .sequentiallyConsistent)
+        let finalCount = count
+        let finalAccumulated = accumulatedCount
         XCTAssert(finalCount == finalAccumulated, "The queue wasn't deterministic")
         XCTAssertNil(queue.dequeue())
     }
 
     func testSPSCBoundedQueue128() {
+#if canImport(Atomics)
         let spscBoundedQueue128 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 128)
         test(name: "SPSCBoundedQueue128", queue: spscBoundedQueue128, writers: 1, readers: 1, elements: 128)
         test(name: "SPSCBoundedQueue128", queue: spscBoundedQueue128, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
         test(name: "SPSCBoundedQueue128", queue: spscBoundedQueue128, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
+#endif
     }
     
     func testSPSCBoundedQueue1024() {
+#if canImport(Atomics)
         let spscBoundedQueue1024 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 1024)
         test(name: "SPSCBoundedQueue1024", queue: spscBoundedQueue1024, writers: 1, readers: 1, elements: 128)
         test(name: "SPSCBoundedQueue1024", queue: spscBoundedQueue1024, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
         test(name: "SPSCBoundedQueue1024", queue: spscBoundedQueue1024, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
+#endif
     }
     
     func testSPSCBoundedQueue65536() {
+#if canImport(Atomics)
         let spscBoundedQueue65536 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 65536)
         test(name: "SPSCBoundedQueue65536", queue: spscBoundedQueue65536, writers: 1, readers: 1, elements: 128)
         test(name: "SPSCBoundedQueue65536", queue: spscBoundedQueue65536, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
         test(name: "SPSCBoundedQueue65536", queue: spscBoundedQueue65536, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
+#endif
     }
     
     func testSPSCBoundedQueue1000000() {
+#if canImport(Atomics)
         let spscBoundedQueue1000000 = SPSCBoundedQueue<(item: Int, thread: Int)>(size: 1_000_000)
         test(name: "SPSCBoundedQueue1000000", queue: spscBoundedQueue1000000, writers: 1, readers: 1, elements: 128)
         test(name: "SPSCBoundedQueue1000000", queue: spscBoundedQueue1000000, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
         test(name: "SPSCBoundedQueue1000000", queue: spscBoundedQueue1000000, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
+#endif
     }
     
     func testSPSCQueue() {
+#if canImport(Atomics)
         let spscQueue = SPSCQueue<(item: Int, thread: Int)>()
         test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: 128)
         test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
         test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
+#endif
     }
     
     func testMPMCBoundedQueue128() {
+#if canImport(Atomics)
         let mpmcBoundedQueue128 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 128)
         for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "MPMCBoundedQueue128", queue: mpmcBoundedQueue128, writers: i / 2, readers: i / 2, elements: 1_000_00)
@@ -80,9 +105,11 @@ final class SebbuTSDSTests: XCTestCase {
             test(name: "MPMCBoundedQueue128", queue: mpmcBoundedQueue128, writers: i - i / 2, readers: i / 2, elements: 1_000_00)
             test(name: "MPMCBoundedQueue128", queue: mpmcBoundedQueue128, writers: i - 1, readers: 1, elements: 1_000_00)
         }
+#endif
     }
     
     func testMPMCBoundedQueue1024() {
+#if canImport(Atomics)
         let mpmcBoundedQueue1024 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 1024)
         for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "MPMCBoundedQueue1024", queue: mpmcBoundedQueue1024, writers: i / 2, readers: i / 2, elements: 1_000_00)
@@ -90,9 +117,11 @@ final class SebbuTSDSTests: XCTestCase {
             test(name: "MPMCBoundedQueue1024", queue: mpmcBoundedQueue1024, writers: i - i / 2, readers: i / 2, elements: 1_000_00)
             test(name: "MPMCBoundedQueue1024", queue: mpmcBoundedQueue1024, writers: i - 1, readers: 1, elements: 1_000_00)
         }
+#endif
     }
     
     func testMPMCBoundedQueue65536() {
+#if canImport(Atomics)
         let mpmcBoundedQueue65536 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 65536)
         for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "MPMCBoundedQueue65536", queue: mpmcBoundedQueue65536, writers: i / 2, readers: i / 2, elements: 1_000_00)
@@ -100,13 +129,16 @@ final class SebbuTSDSTests: XCTestCase {
             test(name: "MPMCBoundedQueue65536", queue: mpmcBoundedQueue65536, writers: i - i / 2, readers: i / 2, elements: 1_000_00)
             test(name: "MPMCBoundedQueue65536", queue: mpmcBoundedQueue65536, writers: i - 1, readers: 1, elements: 1_000_00)
         }
+#endif
     }
     
     func testMPSCQueue() {
+#if canImport(Atomics)
         let mpscQueue = MPSCQueue<(item: Int, thread: Int)>()
         for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "MPSCQueue", queue: mpscQueue, writers: i - 1, readers: 1, elements: 1_000_00)
         }
+#endif
     }
     
     func testLockedQueue() {

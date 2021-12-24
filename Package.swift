@@ -15,10 +15,10 @@ let package = Package(
     targets: [
         .target(
             name: "SebbuTSDS",
-            dependencies: [.product(name: "Atomics", package: "swift-atomics")]),
+            dependencies: [.product(name: "Atomics", package: "swift-atomics", condition: .when(platforms: [.iOS, .macOS, .tvOS, .watchOS, .linux]))]),
         .testTarget(
             name: "SebbuTSDSTests",
             dependencies: ["SebbuTSDS",
-                           .product(name: "Atomics", package: "swift-atomics")]),
+                           .product(name: "Atomics", package: "swift-atomics", condition: .when(platforms: [.iOS, .macOS, .tvOS, .watchOS, .linux]))]),
     ]
 )

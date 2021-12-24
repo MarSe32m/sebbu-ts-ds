@@ -8,10 +8,14 @@
 import Foundation
 import XCTest
 import SebbuTSDS
+
+#if canImport(Atomics)
 import Atomics
+#endif
 
 final class SebbuTSDSBenchamrkTests: XCTestCase {
     func testSPSCBoundedQueueRoundTrip128() {
+#if canImport(Atomics)
         var isDebug = false
         assert({isDebug = true; return isDebug}())
         if isDebug { return }
@@ -37,9 +41,11 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
             }
             canProduce.store(true, ordering: .sequentiallyConsistent)
         }
+#endif
     }
     
     func testSPSCBoundedQueueRoundTrip1024() {
+#if canImport(Atomics)
         var isDebug = false
         assert({isDebug = true; return isDebug}())
         if isDebug { return }
@@ -65,9 +71,11 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
             }
             canProduce.store(true, ordering: .sequentiallyConsistent)
         }
+#endif
     }
     
     func testSPSCBoundedQueueRoundTrip65536() {
+#if canImport(Atomics)
         var isDebug = false
         assert({isDebug = true; return isDebug}())
         if isDebug { return }
@@ -93,9 +101,11 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
             }
             canProduce.store(true, ordering: .sequentiallyConsistent)
         }
+#endif
     }
     
     func testSPSCQueueRoundTrip() {
+#if canImport(Atomics)
         var isDebug = false
         assert({isDebug = true; return isDebug}())
         if isDebug { return }
@@ -121,9 +131,11 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
             }
             canProduce.store(true, ordering: .sequentiallyConsistent)
         }
+#endif
     }
     
     func testLockedQueueRoundTrip() {
+#if canImport(Atomics)
         var isDebug = false
         assert({isDebug = true; return isDebug}())
         if isDebug { return }
@@ -149,9 +161,11 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
             }
             canProduce.store(true, ordering: .sequentiallyConsistent)
         }
+#endif
     }
     
     func testMPMCBoundedQueueRoundTrip() {
+#if canImport(Atomics)
         var isDebug = false
         assert({isDebug = true; return isDebug}())
         if isDebug { return }
@@ -177,9 +191,11 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
             }
             canProduce.store(true, ordering: .sequentiallyConsistent)
         }
+#endif
     }
     
     func testMPSCQueueRoundTrip() {
+#if canImport(Atomics)
         var isDebug = false
         assert({isDebug = true; return isDebug}())
         if isDebug { return }
@@ -205,5 +221,6 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
             }
             canProduce.store(true, ordering: .sequentiallyConsistent)
         }
+#endif
     }
 }

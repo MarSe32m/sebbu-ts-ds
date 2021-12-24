@@ -4,7 +4,7 @@
 //
 //  Created by Sebastian Toivonen on 6.12.2020.
 //
-
+#if canImport(Atomics)
 import Atomics
 
 public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
@@ -69,4 +69,4 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
         }
     }
 }
-
+#endif

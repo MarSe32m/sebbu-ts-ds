@@ -5,6 +5,8 @@
 //  Created by Sebastian Toivonen on 6.12.2020.
 //
 
+import Foundation
+
 extension FixedWidthInteger {
     /// Returns the next power of two.
     @inlinable
@@ -13,5 +15,13 @@ extension FixedWidthInteger {
             return 1
         }
         return 1 << (Self.bitWidth - (self - 1).leadingZeroBitCount)
+    }
+}
+
+extension NSLock {
+    @inline(__always)
+    final func withLock<T>(_ block: () throws -> T) rethrows -> T {
+        lock(); defer { unlock() }
+        return try block()
     }
 }

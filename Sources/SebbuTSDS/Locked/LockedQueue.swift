@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Atomics
 
 public final class LockedQueue<Element>: ConcurrentQueue {
     @usableFromInline
@@ -22,15 +21,20 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     internal var tailIndex = 0
     
     @usableFromInline
-    internal var _resizeAutomatically: ManagedAtomic<Bool>
+    internal var _resizeAutomatically: Bool
     
     @inline(__always)
     public var resizeAutomatically: Bool {
         get {
-            return _resizeAutomatically.load(ordering: .relaxed)
+            lock.lock()
+            let returnValue = _resizeAutomatically
+            lock.unlock()
+            return returnValue
         }
         set (newValue) {
-            _resizeAutomatically.store(newValue, ordering: .relaxed)
+            lock.lock()
+            _resizeAutomatically = newValue
+            lock.unlock()
         }
     }
     
@@ -42,7 +46,7 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     public init(size: Int, resizeAutomatically: Bool = false) {
         buffer = UnsafeMutableBufferPointer.allocate(capacity: size.nextPowerOf2())
         buffer.initialize(repeating: nil)
-        _resizeAutomatically = ManagedAtomic<Bool>(resizeAutomatically)
+        _resizeAutomatically = resizeAutomatically
     }
     
     deinit {
@@ -55,7 +59,7 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     public func enqueue(_ value: Element) -> Bool {
         lock.lock(); defer { lock.unlock() }
         if (tailIndex + 1) & self.mask == headIndex {
-            if _resizeAutomatically.load(ordering: .relaxed) {
+            if _resizeAutomatically {
                 _grow()
             } else {
                 return false
@@ -71,7 +75,10 @@ public final class LockedQueue<Element>: ConcurrentQueue {
     public func dequeue() -> Element? {
         lock.lock(); defer { lock.unlock() }
         if headIndex == tailIndex { return nil }
-        defer { headIndex = (headIndex + 1) & self.mask }
+        defer {
+            buffer[headIndex] = nil
+            headIndex = (headIndex + 1) & self.mask
+        }
         return buffer[headIndex]
     }
     
