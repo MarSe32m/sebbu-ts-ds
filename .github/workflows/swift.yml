@@ -50,11 +50,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-         - tag: 5.5-RELEASE
-           branch: swift-5.5-release
-         #- tag: 5.5-DEVELOPMENT-SNAPSHOT-2021-09-06-a
-         #  branch: swift-5.5-branch
-         - tag: DEVELOPMENT-SNAPSHOT-2021-09-18-a
+         - tag: 5.5.2-RELEASE
+           branch: swift-5.5.2-release
+         - tag: DEVELOPMENT-SNAPSHOT-2021-12-06-a
            branch: development
            
     steps:
@@ -65,13 +63,11 @@ jobs:
     - uses: actions/checkout@v2
     - name: Swift Version
       run: swift --version
-    # Atomics library doesn't work on Windows yet so we will disable building for now
-    #- name: Build (Debug)
-    #  run: swift build -v -c debug
-    #- name: Build (Release)
-    #  run: swift build -v -c release
-    # For some reason the tests will hang, for now just run them on the development machine
-    #- name: Test (Debug)
-    #  run: swift test -v --configuration debug --enable-test-discovery
-    #- name: Test (Release)
-    #  run: swift test -v --configuration release --enable-test-discovery -Xswiftc -enable-testing
+    - name: Build (Debug)
+      run: swift build -v -c debug
+    - name: Build (Release)
+      run: swift build -v -c release
+    - name: Test (Debug)
+      run: swift test -v --configuration debug --enable-test-discovery
+    - name: Test (Release)
+      run: swift test -v --configuration release --enable-test-discovery -Xswiftc -enable-testing
