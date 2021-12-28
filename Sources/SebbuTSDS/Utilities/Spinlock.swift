@@ -22,7 +22,7 @@ public final class Spinlock {
             // Wait for the lock to be released without generating cache misses
             while _lock.load(ordering: .relaxed) {
                 //TODO: Issue X86 or ARM YIELD instruction to reduce contention between hyper-threads
-                //__builtin_ia_32_pause()
+                //__builtin_ia32_pause()
             }
         }
     }
