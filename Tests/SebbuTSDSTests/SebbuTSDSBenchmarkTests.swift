@@ -13,7 +13,7 @@ import SebbuTSDS
 import Atomics
 #endif
 
-final class SebbuTSDSBenchamrkTests: XCTestCase {
+final class SebbuTSDSBenchmarkTests: XCTestCase {
     func testSPSCBoundedQueueRoundTrip128() {
 #if canImport(Atomics)
         var isDebug = false
@@ -200,6 +200,36 @@ final class SebbuTSDSBenchamrkTests: XCTestCase {
         assert({isDebug = true; return isDebug}())
         if isDebug { return }
         let queue = MPSCQueue<Int>()
+        let canProduce = ManagedAtomic<Bool>(true)
+        Thread.detachNewThread {
+            while true {
+                canProduce.store(false, ordering: .sequentiallyConsistent)
+                for i in 0 ... 1_000 {
+                    while !queue.enqueue(i) {}
+                }
+                while !canProduce.load(ordering: .sequentiallyConsistent) {}
+            }
+        }
+        
+        measure {
+            while true {
+                if let value = queue.dequeue() {
+                    if value == 1_000 {
+                        break
+                    }
+                }
+            }
+            canProduce.store(true, ordering: .sequentiallyConsistent)
+        }
+#endif
+    }
+    
+    func testSpinlockedQueueRoundTrip() {
+#if canImport(Atomics)
+        var isDebug = false
+        assert({isDebug = true; return isDebug}())
+        if isDebug { return }
+        let queue = SpinlockedQueue<Int>(size: 1024, resizeAutomatically: false)
         let canProduce = ManagedAtomic<Bool>(true)
         Thread.detachNewThread {
             while true {

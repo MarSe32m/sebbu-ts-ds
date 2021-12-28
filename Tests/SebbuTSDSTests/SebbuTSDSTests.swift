@@ -156,6 +156,22 @@ final class SebbuTSDSTests: XCTestCase {
         }
     }
     
+    func testSpinlockedQueue() {
+#if canImport(Atomics)
+        let spinlockedQueue = SpinlockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: false)
+        let spinlockedQueueAutomaticResize = SpinlockedQueue<(item: Int, thread: Int)>(size: 16, resizeAutomatically: true)
+        
+        let count = ProcessInfo.processInfo.processorCount >= 2 ? ProcessInfo.processInfo.processorCount : 2
+        
+        for i in 2...count {
+            test(name: "SpinlockedQueue", queue: spinlockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_00)
+            test(name: "SpinlockedQueueAutomaticResize", queue: spinlockedQueueAutomaticResize, writers: i / 2, readers: i / 2, elements: 1_000_00)
+            test(name: "SpinlockedQueue", queue: spinlockedQueue, writers: i - 1, readers: 1, elements: 1_000_00)
+            test(name: "SpinlockedQueueAutomaticResize", queue: spinlockedQueueAutomaticResize, writers: i - 1, readers: 1, elements: 1_000_00)
+        }
+#endif
+    }
+    
     func testDraining() {
 #if canImport(Atomics)
         do {
@@ -169,6 +185,8 @@ final class SebbuTSDSTests: XCTestCase {
             let mpmcBoundedQueue65536 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 65536)
             
             let mpscQueue = MPSCQueue<(item: Int, thread: Int)>()
+            let spinlockedQueue = SpinlockedQueue<(item: Int, thread: Int)>(size: 16, resizeAutomatically: false)
+            let spinlockedQueueAutomaticResize = SpinlockedQueue<(item: Int, thread: Int)>(size: 16, resizeAutomatically: true)
             
             for i in 0..<1_000_000 {
                 spscBoundedQueue128.enqueue((item: i, thread: 0))
@@ -179,7 +197,8 @@ final class SebbuTSDSTests: XCTestCase {
                 mpmcBoundedQueue1024.enqueue((item: i, thread: 0))
                 mpmcBoundedQueue65536.enqueue((item: i, thread: 0))
                 mpscQueue.enqueue((item: i, thread: 0))
-                
+                spinlockedQueue.enqueue((item: i, thread: 0))
+                spinlockedQueueAutomaticResize.enqueue((item: i, thread: 0))
             }
             spscBoundedQueue128.dequeueAll { _ in }
             spscBoundedQueue1024.dequeueAll { _ in }
@@ -189,6 +208,8 @@ final class SebbuTSDSTests: XCTestCase {
             mpmcBoundedQueue1024.dequeueAll { _ in }
             mpmcBoundedQueue65536.dequeueAll { _ in }
             mpscQueue.dequeueAll { _ in }
+            spinlockedQueue.dequeueAll { _ in }
+            spinlockedQueueAutomaticResize.dequeueAll { _ in }
             
             XCTAssertNil(spscBoundedQueue128.dequeue())
             XCTAssertNil(spscBoundedQueue1024.dequeue())
@@ -198,6 +219,8 @@ final class SebbuTSDSTests: XCTestCase {
             XCTAssertNil(mpmcBoundedQueue1024.dequeue())
             XCTAssertNil(mpmcBoundedQueue65536.dequeue())
             XCTAssertNil(mpscQueue.dequeue())
+            XCTAssertNil(spinlockedQueue.dequeue())
+            XCTAssertNil(spinlockedQueueAutomaticResize.dequeue())
         }
 #endif
         
