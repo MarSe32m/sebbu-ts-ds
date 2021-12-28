@@ -5,8 +5,8 @@
 //  Created by Sebastian Toivonen on 28.12.2021.
 //
 
+#if canImport(Atomics)
 import Atomics
-import Darwin
 
 public final class Spinlock {
     @usableFromInline
@@ -22,7 +22,8 @@ public final class Spinlock {
             // Wait for the lock to be released without generating cache misses
             while _lock.load(ordering: .relaxed) {
                 //TODO: Issue X86 or ARM YIELD instruction to reduce contention between hyper-threads
-                //__builtin_ia32_pause()
+                // GCC and clang: __builtin_ia32_pause()
+                // MSVC: _mm_pause()
             }
         }
     }
@@ -49,4 +50,4 @@ public final class Spinlock {
         _lock.destroy()
     }
 }
-
+#endif

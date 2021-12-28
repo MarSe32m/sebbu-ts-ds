@@ -4,7 +4,7 @@
 //
 //  Created by Sebastian Toivonen on 28.12.2021.
 //
-
+#if canImport(Atomics)
 /// Differs from the LockedQueue by just the lock. Instead of a standard lock, this one uses a spinlock.
 public final class SpinlockedQueue<Element>: ConcurrentQueue {
     @usableFromInline
@@ -148,3 +148,4 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue {
         newBuffer.deallocate()
     }
 }
+#endif
