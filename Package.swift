@@ -10,12 +10,14 @@ let package = Package(
             targets: ["SebbuTSDS"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-atomics.git", .branch("main"))
+        .package(url: "https://github.com/apple/swift-atomics.git", .branch("main")),
+        .package(url: "https://github.com/apple/swift-collections.git", .branch("main"))
     ],
     targets: [
         .target(
             name: "SebbuTSDS",
-            dependencies: [.product(name: "Atomics", package: "swift-atomics", condition: .when(platforms: [.iOS, .macOS, .tvOS, .watchOS, .linux]))]),
+            dependencies: [.product(name: "Atomics", package: "swift-atomics", condition: .when(platforms: [.iOS, .macOS, .tvOS, .watchOS, .linux])),
+                           .product(name: "DequeModule", package: "swift-collections")]),
         .testTarget(
             name: "SebbuTSDSTests",
             dependencies: ["SebbuTSDS",

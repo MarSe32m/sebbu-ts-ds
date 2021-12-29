@@ -5,7 +5,7 @@ import Foundation
 #if canImport(Atomics)
 import Atomics
 #endif
-final class SebbuTSDSTests: XCTestCase {
+final class SebbuTSDSQueueTests: XCTestCase {
     private func test<T: ConcurrentQueue>(name: String, queue: T, writers: Int, readers: Int, elements: Int = 10_000) where T.Element == (item: Int, thread: Int) {
         let threadCount = writers + readers
         let countLock = NSLock()
