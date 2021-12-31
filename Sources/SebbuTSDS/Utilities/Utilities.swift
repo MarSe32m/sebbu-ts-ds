@@ -18,7 +18,7 @@ extension FixedWidthInteger {
     }
 }
 
-extension NSLock {
+public extension NSLock {
     @inline(__always)
     final func withLock<T>(_ block: () throws -> T) rethrows -> T {
         lock(); defer { unlock() }
