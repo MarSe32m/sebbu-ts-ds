@@ -8,8 +8,11 @@
 import Foundation
 
 public final class LockedDictionary<Key: Hashable, Value> {
-    private var _buffer: [Key: Value] = [:]
-    private let _lock = NSLock()
+    @usableFromInline
+    internal var _buffer: [Key: Value] = [:]
+    
+    @usableFromInline
+    internal let _lock = NSLock()
     
     public var keys: [Key] {
         _lock.withLock {
@@ -31,18 +34,21 @@ public final class LockedDictionary<Key: Hashable, Value> {
     
     public init() {}
     
+    @inlinable
     public final func set(value: Value, forKey key: Key) {
         _lock.withLock {
             _buffer[key] = value
         }
     }
     
+    @inlinable
     public final func removeValue(forKey key: Key) -> Value? {
         _lock.withLock {
             _buffer.removeValue(forKey: key)
         }
     }
     
+    @inlinable
     public final func contains(_ key: Key) -> Bool {
         _lock.withLock {
             _buffer.index(forKey: key) != nil
@@ -50,6 +56,7 @@ public final class LockedDictionary<Key: Hashable, Value> {
     }
     
     @discardableResult
+    @inlinable
     public final func setIfNotExist(_ key: Key, value: Value) -> Bool {
         _lock.withLock {
             if _buffer[key] != nil { return false }
@@ -58,12 +65,14 @@ public final class LockedDictionary<Key: Hashable, Value> {
         }
     }
     
+    @inlinable
     public final func value(forKey key: Key) -> Value? {
         _lock.withLock {
             _buffer[key]
         }
     }
     
+    @inlinable
     public final func mutateValue(forKey key: Key, transformation: (Value?) -> Value?) {
         _lock.withLock {
             let currentValue = _buffer[key]
@@ -71,6 +80,7 @@ public final class LockedDictionary<Key: Hashable, Value> {
         }
     }
     
+    @inlinable
     public subscript(key: Key) -> Value? {
         get {
             value(forKey: key)

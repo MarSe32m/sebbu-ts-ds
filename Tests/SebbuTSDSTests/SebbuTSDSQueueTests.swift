@@ -241,4 +241,79 @@ final class SebbuTSDSQueueTests: XCTestCase {
         XCTAssertNil(lockedQueueAutomaticResize.dequeue())
         
     }
+    
+    func testLockedQueueCount() {
+        func remove(_ queue: LockedQueue<Int>) -> Int {
+            return queue.dequeue() != nil ? -1 : 0
+        }
+        
+        func add(_ queue: LockedQueue<Int>) -> Int {
+            return queue.enqueue(Int.random(in: .min ... .max)) ? 1 : 0
+        }
+        
+        var queue = LockedQueue<Int>(size: 2, resizeAutomatically: true)
+        for i in 1...1_000_000 {
+            queue.enqueue(i)
+            XCTAssert(queue.count == i)
+        }
+        var elements = queue.count
+        for _ in 0..<500000 {
+            elements += remove(queue)
+        }
+        XCTAssertEqual(queue.count, elements)
+        
+        queue = LockedQueue<Int>(size: 32)
+        elements = 0
+        for i in 1...24 {
+            elements += 1
+            if !queue.enqueue(i) {
+                print("WTF")
+            }
+            let count = queue.count
+            XCTAssertEqual(elements, count)
+        }
+        
+        for _ in 0..<10000000 {
+            elements += Bool.random() ? add(queue) : remove(queue)
+            XCTAssertEqual(queue.count, elements)
+        }
+    }
+    
+    func testSpinlockedQueueCount() {
+#if canImport(Atomics)
+        func remove(_ queue: SpinlockedQueue<Int>) -> Int {
+            return queue.dequeue() != nil ? -1 : 0
+        }
+        
+        func add(_ queue: SpinlockedQueue<Int>) -> Int {
+            return queue.enqueue(Int.random(in: .min ... .max)) ? 1 : 0
+        }
+        
+        var queue = SpinlockedQueue<Int>(size: 2, resizeAutomatically: true)
+        for i in 1...1_000_000 {
+            queue.enqueue(i)
+            XCTAssert(queue.count == i)
+        }
+        var elements = queue.count
+        for _ in 0..<500000 {
+            elements += remove(queue)
+        }
+        XCTAssertEqual(queue.count, elements)
+        queue = SpinlockedQueue<Int>(size: 32)
+        elements = 0
+        for i in 1...24 {
+            elements += 1
+            if !queue.enqueue(i) {
+                print("WTF")
+            }
+            let count = queue.count
+            XCTAssertEqual(elements, count)
+        }
+        
+        for _ in 0..<10000000 {
+            elements += Bool.random() ? add(queue) : remove(queue)
+            XCTAssertEqual(queue.count, elements)
+        }
+#endif
+    }
 }

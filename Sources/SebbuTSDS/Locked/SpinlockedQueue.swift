@@ -41,6 +41,17 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue {
         return self.buffer.count &- 1
     }
     
+    @inlinable
+    internal var _count: Int {
+        return tailIndex < headIndex ? (buffer.count - headIndex + tailIndex) : (tailIndex - headIndex)
+    }
+    
+    public var count: Int {
+        lock.withLock {
+            _count
+        }
+    }
+    
     public init(size: Int, resizeAutomatically: Bool = false) {
         buffer = UnsafeMutableBufferPointer.allocate(capacity: size.nextPowerOf2())
         buffer.initialize(repeating: nil)
@@ -104,19 +115,18 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue {
     }
     
     /// Removes all the elements specified by the given predicate. This will aquire the lock for the whole duration of the removal.
-    public func removeAll(where predicate: (Element) -> Bool) {
+    public func removeAll(where shouldBeRemoved: (Element) throws -> Bool) rethrows {
         lock.lock(); defer { lock.unlock() }
-        var notRemoved = [Element]()
-        while let element = _dequeue() {
-            if !predicate(element) {
-                notRemoved.append(element)
+        let elementCount = _count
+        if elementCount == 0 { return }
+        for _ in 0..<elementCount {
+            guard let element = _dequeue() else {
+                fatalError("Failed to dequeue an item from a non empty queue?")
             }
-        }
-        for element in notRemoved {
-            let enqueued = _enqueue(element)
-            // This should always be true, because either we have the same amount of elements as we started with
-            // or we removed some so the queue can't be full
-            assert(enqueued)
+            if try !shouldBeRemoved(element) {
+                let enqueued = _enqueue(element)
+                assert(enqueued)
+            }
         }
     }
     

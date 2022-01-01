@@ -31,7 +31,7 @@ public final class Spinlock {
     @inline(__always)
     public final func tryLock() -> Bool {
         // First do a relaxed load to check if the lock is free in order to prevent
-        // unnecessary chache misses if someone does a while !tryLock() {...}
+        // unnecessary cache misses if someone does a while !tryLock() {...}
         !_lock.load(ordering: .relaxed) && !_lock.exchange(true, ordering: .acquiring)
     }
     

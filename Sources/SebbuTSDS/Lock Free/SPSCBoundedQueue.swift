@@ -19,10 +19,16 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
     internal var buffer: UnsafeMutableBufferPointer<Element?>
     
     @usableFromInline
-    internal let head = ManagedAtomic<Int>(0)
+    internal let head = UnsafeAtomic<Int>.create(0)
     
     @usableFromInline
-    internal let tail = ManagedAtomic<Int>(0)
+    internal let tail = UnsafeAtomic<Int>.create(0)
+    
+    public var count: Int {
+        let headIndex = head.load(ordering: .relaxed)
+        let tailIndex = tail.load(ordering: .relaxed)
+        return tailIndex < headIndex ? (buffer.count - headIndex + tailIndex) : (tailIndex - headIndex)
+    }
     
     public init(size: Int) {
         precondition(size >= 2, "Queue capacity too small")
@@ -34,6 +40,8 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue {
     
     deinit {
         buffer.deallocate()
+        head.destroy()
+        tail.destroy()
     }
     
     @discardableResult

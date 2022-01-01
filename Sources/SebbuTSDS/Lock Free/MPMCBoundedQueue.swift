@@ -29,10 +29,16 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue {
     internal var buffer: UnsafeMutableBufferPointer<BufferNode>
     
     @usableFromInline
-    internal var head = ManagedAtomic<Int>(0)
+    internal var head = UnsafeAtomic<Int>.create(0)
     
     @usableFromInline
-    internal var tail = ManagedAtomic<Int>(0)
+    internal var tail = UnsafeAtomic<Int>.create(0)
+    
+    public var count: Int {
+        let headIndex = head.load(ordering: .relaxed)
+        let tailIndex = tail.load(ordering: .relaxed)
+        return tailIndex < headIndex ? (buffer.count - headIndex + tailIndex) : (tailIndex - headIndex)
+    }
     
     public init(size _size: Int) {
         self.size = _size.nextPowerOf2()
@@ -48,6 +54,8 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue {
     
     deinit {
         buffer.deallocate()
+        head.destroy()
+        tail.destroy()
     }
     
     @discardableResult
