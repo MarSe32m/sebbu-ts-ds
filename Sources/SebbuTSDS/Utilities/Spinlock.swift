@@ -7,6 +7,7 @@
 
 #if canImport(Atomics)
 import Atomics
+import CSebbuTSDS
 
 public final class Spinlock {
     @usableFromInline
@@ -21,9 +22,8 @@ public final class Spinlock {
             if (!_lock.exchange(true, ordering: .acquiring)) { return }
             // Wait for the lock to be released without generating cache misses
             while _lock.load(ordering: .relaxed) {
-                //TODO: Issue X86 or ARM YIELD instruction to reduce contention between hyper-threads
-                // GCC and clang: __builtin_ia32_pause()
-                // MSVC: _mm_pause()
+                //Issue an X86_64 pause or arm yield instruction
+                _pause()
             }
         }
     }
