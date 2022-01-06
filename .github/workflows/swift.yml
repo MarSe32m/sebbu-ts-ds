@@ -52,7 +52,7 @@ jobs:
         include:
          - tag: 5.5.2-RELEASE
            branch: swift-5.5.2-release
-         - tag: DEVELOPMENT-SNAPSHOT-2021-12-06-a
+         - tag: DEVELOPMENT-SNAPSHOT-2021-12-23-a
            branch: development
            
     steps:
