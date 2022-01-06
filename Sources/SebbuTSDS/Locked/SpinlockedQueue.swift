@@ -6,7 +6,7 @@
 //
 #if canImport(Atomics)
 /// Differs from the LockedQueue by just the lock. Instead of a standard lock, this one uses a spinlock.
-public final class SpinlockedQueue<Element>: ConcurrentQueue {
+public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal let lock = Spinlock()
     

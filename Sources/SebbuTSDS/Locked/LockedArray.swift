@@ -7,7 +7,7 @@
 
 import Foundation
 
-public final class LockedArray<Element> {
+public final class LockedArray<Element>: @unchecked Sendable {
     @usableFromInline
     internal var _buffer: [Element] = []
     

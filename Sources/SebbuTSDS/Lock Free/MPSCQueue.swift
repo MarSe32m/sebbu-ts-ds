@@ -7,7 +7,7 @@
 #if canImport(Atomics)
 import Atomics
 
-public final class MPSCQueue<Element>: ConcurrentQueue {
+public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal struct BufferNode {
         

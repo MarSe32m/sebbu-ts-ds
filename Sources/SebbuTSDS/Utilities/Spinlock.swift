@@ -9,7 +9,7 @@
 import Atomics
 import CSebbuTSDS
 
-public final class Spinlock {
+public final class Spinlock: @unchecked Sendable {
     @usableFromInline
     internal let _lock = UnsafeAtomic<Bool>.create(false)
     

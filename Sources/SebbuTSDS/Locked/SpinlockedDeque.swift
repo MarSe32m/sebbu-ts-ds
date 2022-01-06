@@ -7,7 +7,7 @@
 #if canImport(Atomics)
 import DequeModule
 
-public final class SpinlockedDeque<Element>: ConcurrentDeque {
+public final class SpinlockedDeque<Element>: ConcurrentDeque, @unchecked Sendable {
     @usableFromInline
     internal var _deque = Deque<Element>()
     

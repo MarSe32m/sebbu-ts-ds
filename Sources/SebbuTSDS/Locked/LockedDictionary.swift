@@ -7,7 +7,7 @@
 
 import Foundation
 
-public final class LockedDictionary<Key: Hashable, Value> {
+public final class LockedDictionary<Key: Hashable, Value>: @unchecked Sendable {
     @usableFromInline
     internal var _buffer: [Key: Value] = [:]
     

@@ -7,7 +7,7 @@
 
 import Foundation
 
-public final class LockedQueue<Element>: ConcurrentQueue {
+public final class LockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal let lock = NSLock()
     

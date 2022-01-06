@@ -8,7 +8,7 @@
 import DequeModule
 import Foundation
 
-public final class LockedDeque<Element>: ConcurrentDeque {
+public final class LockedDeque<Element>: ConcurrentDeque, @unchecked Sendable {
     @usableFromInline
     internal var _deque = Deque<Element>()
     

@@ -7,7 +7,7 @@
 #if canImport(Atomics)
 import Atomics
 
-public final class SPSCQueue<Element>: ConcurrentQueue {
+public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal struct Node {
         

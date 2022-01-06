@@ -25,3 +25,5 @@ public extension NSLock {
         return try block()
     }
 }
+
+extension NSLock: @unchecked Sendable {}
