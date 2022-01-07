@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "sebbu-ts-ds",
+    platforms: [.macOS(.v10_12), .iOS(.v10)],
     products: [
         .library(
             name: "SebbuTSDS",

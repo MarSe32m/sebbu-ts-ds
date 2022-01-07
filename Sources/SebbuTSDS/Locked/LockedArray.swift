@@ -5,14 +5,12 @@
 //  Created by Sebastian Toivonen on 24.12.2021.
 //
 
-import Foundation
-
 public final class LockedArray<Element>: @unchecked Sendable {
     @usableFromInline
     internal var _buffer: [Element] = []
     
     @usableFromInline
-    internal let _lock = NSLock()
+    internal let _lock = Lock()
     
     public var values: [Element] {
         _lock.withLock {

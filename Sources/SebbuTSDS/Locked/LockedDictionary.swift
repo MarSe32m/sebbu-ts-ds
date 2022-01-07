@@ -5,14 +5,12 @@
 //  Created by Sebastian Toivonen on 24.12.2021.
 //
 
-import Foundation
-
 public final class LockedDictionary<Key: Hashable, Value>: @unchecked Sendable {
     @usableFromInline
     internal var _buffer: [Key: Value] = [:]
     
     @usableFromInline
-    internal let _lock = NSLock()
+    internal let _lock = Lock()
     
     public var keys: [Key] {
         _lock.withLock {

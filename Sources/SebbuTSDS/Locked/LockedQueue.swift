@@ -5,11 +5,9 @@
 //  Created by Sebastian Toivonen on 6.12.2020.
 //
 
-import Foundation
-
 public final class LockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
-    internal let lock = NSLock()
+    internal let lock = Lock()
     
     @usableFromInline
     internal var buffer: UnsafeMutableBufferPointer<Element?>

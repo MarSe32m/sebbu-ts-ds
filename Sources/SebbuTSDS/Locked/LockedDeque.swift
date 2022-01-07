@@ -6,14 +6,13 @@
 //
 
 import DequeModule
-import Foundation
 
 public final class LockedDeque<Element>: ConcurrentDeque, @unchecked Sendable {
     @usableFromInline
     internal var _deque = Deque<Element>()
     
     @usableFromInline
-    internal let lock = NSLock()
+    internal let lock = Lock()
     
     public var isEmpty: Bool {
         lock.withLock {
