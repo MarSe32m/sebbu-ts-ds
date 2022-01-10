@@ -5,6 +5,7 @@
 //  Created by Sebastian Toivonen on 28.12.2021.
 //
 #if canImport(Atomics)
+//TODO: Implement shrinking when automaticResizing is enabled?
 /// Differs from the LockedQueue by just the lock. Instead of a standard lock, this one uses a spinlock.
 public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
@@ -143,7 +144,7 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
     /// Doubles the queue size
     @inlinable
     internal func _grow() {
-        let nextSize = max(buffer.count, (buffer.count + 1).nextPowerOf2())
+        let nextSize = Swift.max(buffer.count, (buffer.count + 1).nextPowerOf2())
         var newBuffer = UnsafeMutableBufferPointer<Element?>.allocate(capacity: nextSize)
         newBuffer.initialize(repeating: nil)
         let oldMask = self.mask
@@ -156,6 +157,20 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
         headIndex = 0
         swap(&buffer, &newBuffer)
         newBuffer.deallocate()
+    }
+}
+
+extension SpinlockedQueue: Sequence {
+    public struct Iterator: IteratorProtocol {
+        internal let queue: SpinlockedQueue
+        
+        public func next() -> Element? {
+            queue.dequeue()
+        }
+    }
+    
+    public func makeIterator() -> Iterator {
+        Iterator(queue: self)
     }
 }
 #endif

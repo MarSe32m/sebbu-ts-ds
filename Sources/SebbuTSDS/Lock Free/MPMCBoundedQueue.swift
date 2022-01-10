@@ -120,4 +120,18 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         }
     }
 }
+
+extension MPMCBoundedQueue: Sequence {
+    public struct Iterator: IteratorProtocol {
+        internal let queue: MPMCBoundedQueue
+        
+        public func next() -> Element? {
+            queue.dequeue()
+        }
+    }
+    
+    public func makeIterator() -> Iterator {
+        Iterator(queue: self)
+    }
+}
 #endif

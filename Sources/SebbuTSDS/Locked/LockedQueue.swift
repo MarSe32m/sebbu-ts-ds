@@ -5,6 +5,7 @@
 //  Created by Sebastian Toivonen on 6.12.2020.
 //
 
+//TODO: Implement shrinking when automaticResizing is enabled?
 public final class LockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal let lock = Lock()
@@ -143,7 +144,7 @@ public final class LockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     /// Doubles the queue size
     @inlinable
     internal func _grow() {
-        let nextSize = max(buffer.count, (buffer.count + 1).nextPowerOf2())
+        let nextSize = Swift.max(buffer.count, (buffer.count + 1).nextPowerOf2())
         var newBuffer = UnsafeMutableBufferPointer<Element?>.allocate(capacity: nextSize)
         newBuffer.initialize(repeating: nil)
         let oldMask = self.mask
@@ -175,3 +176,16 @@ public final class LockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
      */
 }
 
+extension LockedQueue: Sequence {
+    public struct Iterator: IteratorProtocol {
+        internal let queue: LockedQueue
+        
+        public func next() -> Element? {
+            queue.dequeue()
+        }
+    }
+    
+    public func makeIterator() -> Iterator {
+        Iterator(queue: self)
+    }
+}

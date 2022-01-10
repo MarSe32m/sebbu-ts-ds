@@ -72,4 +72,18 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         }
     }
 }
+
+extension MPSCQueue: Sequence {
+    public struct Iterator: IteratorProtocol {
+        internal let queue: MPSCQueue
+        
+        public func next() -> Element? {
+            queue.dequeue()
+        }
+    }
+    
+    public func makeIterator() -> Iterator {
+        Iterator(queue: self)
+    }
+}
 #endif

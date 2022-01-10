@@ -87,4 +87,18 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         }
     }
 }
+
+extension SPSCBoundedQueue: Sequence {
+    public struct Iterator: IteratorProtocol {
+        internal let queue: SPSCBoundedQueue
+        
+        public func next() -> Element? {
+            queue.dequeue()
+        }
+    }
+    
+    public func makeIterator() -> Iterator {
+        Iterator(queue: self)
+    }
+}
 #endif

@@ -87,12 +87,56 @@ final class SebbuTSDSQueueTests: XCTestCase {
 #endif
     }
     
+    func testSPSCBoundedQueueSequenceConformance() {
+#if canImport(Atomics)
+        let queue = SPSCBoundedQueue<Int>(size: 1_000)
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        XCTAssertEqual(queue.reduce(0, +), (0..<100).reduce(0, +))
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        for (index, value) in queue.prefix(10).enumerated() {
+            XCTAssertEqual(index, value)
+        }
+        
+        for (index, value) in queue.dropFirst(10).enumerated() {
+            XCTAssertEqual(index + 20, value)
+        }
+#endif
+    }
+    
     func testSPSCQueue() {
 #if canImport(Atomics)
         let spscQueue = SPSCQueue<(item: Int, thread: Int)>()
         test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: 128)
         test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: Int.random(in: 5000...10000))
         test(name: "SPSCQueue", queue: spscQueue, writers: 1, readers: 1, elements: Int.random(in: 5_000_000...10_000_000))
+#endif
+    }
+    
+    func testSPSCQueueSequenceConformance() {
+#if canImport(Atomics)
+        let queue = SPSCQueue<Int>()
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        XCTAssertEqual(queue.reduce(0, +), (0..<100).reduce(0, +))
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        for (index, value) in queue.prefix(10).enumerated() {
+            XCTAssertEqual(index, value)
+        }
+        
+        for (index, value) in queue.dropFirst(10).enumerated() {
+            XCTAssertEqual(index + 20, value)
+        }
 #endif
     }
     
@@ -132,11 +176,55 @@ final class SebbuTSDSQueueTests: XCTestCase {
 #endif
     }
     
+    func testMPMCBoundedQueueSequenceConformance() {
+#if canImport(Atomics)
+        let queue = MPMCBoundedQueue<Int>(size: 1_000)
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        XCTAssertEqual(queue.reduce(0, +), (0..<100).reduce(0, +))
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        for (index, value) in queue.prefix(10).enumerated() {
+            XCTAssertEqual(index, value)
+        }
+        
+        for (index, value) in queue.dropFirst(10).enumerated() {
+            XCTAssertEqual(index + 20, value)
+        }
+#endif
+    }
+    
     func testMPSCQueue() {
 #if canImport(Atomics)
         let mpscQueue = MPSCQueue<(item: Int, thread: Int)>()
         for i in 2...ProcessInfo.processInfo.processorCount {
             test(name: "MPSCQueue", queue: mpscQueue, writers: i - 1, readers: 1, elements: 1_000_00)
+        }
+#endif
+    }
+    
+    func testMPSCQueueSequenceConformance() {
+#if canImport(Atomics)
+        let queue = MPSCQueue<Int>()
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        XCTAssertEqual(queue.reduce(0, +), (0..<100).reduce(0, +))
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        for (index, value) in queue.prefix(10).enumerated() {
+            XCTAssertEqual(index, value)
+        }
+        
+        for (index, value) in queue.dropFirst(10).enumerated() {
+            XCTAssertEqual(index + 20, value)
         }
 #endif
     }
@@ -156,6 +244,26 @@ final class SebbuTSDSQueueTests: XCTestCase {
         }
     }
     
+    func testLockedQueueSequenceConformance() {
+        let queue = LockedQueue<Int>(size: 1_000)
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        XCTAssertEqual(queue.reduce(0, +), (0..<100).reduce(0, +))
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        for (index, value) in queue.prefix(10).enumerated() {
+            XCTAssertEqual(index, value)
+        }
+        
+        for (index, value) in queue.dropFirst(10).enumerated() {
+            XCTAssertEqual(index + 20, value)
+        }
+    }
+    
     func testSpinlockedQueue() {
 #if canImport(Atomics)
         let spinlockedQueue = SpinlockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: false)
@@ -168,6 +276,28 @@ final class SebbuTSDSQueueTests: XCTestCase {
             test(name: "SpinlockedQueueAutomaticResize", queue: spinlockedQueueAutomaticResize, writers: i / 2, readers: i / 2, elements: 1_000_00)
             test(name: "SpinlockedQueue", queue: spinlockedQueue, writers: i - 1, readers: 1, elements: 1_000_00)
             test(name: "SpinlockedQueueAutomaticResize", queue: spinlockedQueueAutomaticResize, writers: i - 1, readers: 1, elements: 1_000_00)
+        }
+#endif
+    }
+    
+    func testSpinlockedQueueSequenceConformance() {
+#if canImport(Atomics)
+        let queue = SpinlockedQueue<Int>(size: 1_000)
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        XCTAssertEqual(queue.reduce(0, +), (0..<100).reduce(0, +))
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        for (index, value) in queue.prefix(10).enumerated() {
+            XCTAssertEqual(index, value)
+        }
+        
+        for (index, value) in queue.dropFirst(10).enumerated() {
+            XCTAssertEqual(index + 20, value)
         }
 #endif
     }

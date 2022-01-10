@@ -73,4 +73,18 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         }
     }
 }
+
+extension SPSCQueue: Sequence {
+    public struct Iterator: IteratorProtocol {
+        internal let queue: SPSCQueue
+        
+        public func next() -> Element? {
+            queue.dequeue()
+        }
+    }
+    
+    public func makeIterator() -> Iterator {
+        Iterator(queue: self)
+    }
+}
 #endif
