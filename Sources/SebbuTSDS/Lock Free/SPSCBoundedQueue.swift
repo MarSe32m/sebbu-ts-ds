@@ -29,7 +29,7 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     @usableFromInline
     internal var tailCached: Int = 0
     
-    /// The amount of elemnts that the queue contains
+    /// The amount of elements that the queue contains
     public var count: Int {
         let headIndex = head.load(ordering: .relaxed)
         let tailIndex = tail.load(ordering: .relaxed)
