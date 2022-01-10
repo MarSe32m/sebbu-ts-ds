@@ -10,7 +10,6 @@ import Atomics
 public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal struct BufferNode {
-        
         @usableFromInline
         internal var data: Element?
         

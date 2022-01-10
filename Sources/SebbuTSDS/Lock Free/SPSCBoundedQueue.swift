@@ -8,9 +8,8 @@
 import Atomics
 
 public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
-    
-    @usableFromInline
-    internal let size: Int
+    /// The size of the queue
+    public let size: Int
     
     @usableFromInline
     internal let mask: Int
@@ -22,8 +21,15 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     internal let head = UnsafeAtomic<Int>.create(0)
     
     @usableFromInline
+    internal var headCached: Int = 0
+    
+    @usableFromInline
     internal let tail = UnsafeAtomic<Int>.create(0)
     
+    @usableFromInline
+    internal var tailCached: Int = 0
+    
+    /// The amount of elemnts that the queue contains
     public var count: Int {
         let headIndex = head.load(ordering: .relaxed)
         let tailIndex = tail.load(ordering: .relaxed)
@@ -48,26 +54,30 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     @inlinable
     public final func enqueue(_ value: Element) -> Bool {
         let pos = tail.load(ordering: .relaxed)
-        
-        if (head.load(ordering: .acquiring) - (pos + 1)) & mask >= 1 {
-            buffer[pos & mask] = value
-            tail.store(pos + 1, ordering: .releasing)
-            return true
+        let nextPos = pos + 1
+        if (headCached - nextPos) & mask < 1 {
+            headCached = head.load(ordering: .acquiring)
+            if (headCached - nextPos) & mask < 1 {
+                return false
+            }
         }
-        return false
+        buffer[pos & mask] = value
+        tail.store(pos + 1, ordering: .releasing)
+        return true
     }
     
     @inlinable
     public final func dequeue() -> Element? {
         let pos = head.load(ordering: .relaxed)
-        
-        if (tail.load(ordering: .acquiring) - pos) & mask >= 1 {
-            defer {
-                head.store(pos + 1, ordering: .releasing)
+        if (tailCached - pos) & mask < 1 {
+            tailCached = tail.load(ordering: .acquiring)
+            if (tailCached - pos) & mask < 1 {
+                return nil
             }
-            return buffer[pos & mask]
         }
-        return nil
+        let value = buffer[pos & mask]
+        head.store(pos + 1, ordering: .releasing)
+        return value
     }
     
     @inline(__always)

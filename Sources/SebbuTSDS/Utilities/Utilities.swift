@@ -18,6 +18,11 @@ extension FixedWidthInteger {
     }
 }
 
+@inlinable
+internal func debugOnly(_ body: () -> Void) {
+    assert({ body(); return true}())
+}
+
 public extension NSLock {
     @inline(__always)
     final func withLock<T>(_ block: () throws -> T) rethrows -> T {

@@ -93,8 +93,3 @@ fileprivate func initialize_pthread_mutex(_ pointer: UnsafeMutablePointer<pthrea
     precondition(error == 0, "\(#function) failed to initialize pthread_mutex with error \(error)")
 }
 #endif
-
-@inlinable
-internal func debugOnly(_ body: () -> Void) {
-    assert({ body(); return true}())
-}

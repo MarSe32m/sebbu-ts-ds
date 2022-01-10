@@ -8,7 +8,6 @@
 import Atomics
 
 public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
-    
     @usableFromInline
     internal class BufferNode {
         
