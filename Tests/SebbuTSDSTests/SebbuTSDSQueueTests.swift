@@ -48,7 +48,6 @@ final class SebbuTSDSQueueTests: XCTestCase {
         let finalCount = count
         let finalAccumulated = accumulatedCount
         XCTAssertEqual(finalCount, finalAccumulated, "The queue wasn't deterministic")
-        //XCTAssert(finalCount == finalAccumulated, "The queue wasn't deterministic")
         XCTAssertNil(queue.dequeue())
     }
 
@@ -230,6 +229,37 @@ final class SebbuTSDSQueueTests: XCTestCase {
 #endif
     }
     
+    func testMPSCBoundedQueue() {
+#if canImport(Atomics)
+        let mpscQueue = MPSCBoundedQueue<(item: Int, thread: Int)>(size: 10000)
+        for i in 2...ProcessInfo.processInfo.processorCount {
+            test(name: "MPSCQueue", queue: mpscQueue, writers: i - 1, readers: 1, elements: 1_000_00)
+        }
+#endif
+    }
+    
+    func testMPSCBoundedQueueSequenceConformance() {
+#if canImport(Atomics)
+        let queue = MPSCBoundedQueue<Int>(size: 1000)
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        XCTAssertEqual(queue.reduce(0, +), (0..<100).reduce(0, +))
+        
+        for i in 0..<100 {
+            queue.enqueue(i)
+        }
+        for (index, value) in queue.prefix(10).enumerated() {
+            XCTAssertEqual(index, value)
+        }
+        
+        for (index, value) in queue.dropFirst(10).enumerated() {
+            XCTAssertEqual(index + 20, value)
+        }
+#endif
+    }
+    
     func testLockedQueue() {
         let lockedQueue = LockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: false)
         let lockedQueueAutomaticResize = LockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: true)
@@ -315,7 +345,12 @@ final class SebbuTSDSQueueTests: XCTestCase {
             let mpmcBoundedQueue1024 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 1024)
             let mpmcBoundedQueue65536 = MPMCBoundedQueue<(item: Int, thread: Int)>(size: 65536)
             
+            let mpscBoundedQueue128 = MPSCBoundedQueue<(item: Int, thread: Int)>(size: 128)
+            let mpscBoundedQueue1024 = MPSCBoundedQueue<(item: Int, thread: Int)>(size: 1024)
+            let mpscBoundedQueue65536 = MPSCBoundedQueue<(item: Int, thread: Int)>(size: 65536)
+            
             let mpscQueue = MPSCQueue<(item: Int, thread: Int)>()
+            
             let spinlockedQueue = SpinlockedQueue<(item: Int, thread: Int)>(size: 16, resizeAutomatically: false)
             let spinlockedQueueAutomaticResize = SpinlockedQueue<(item: Int, thread: Int)>(size: 16, resizeAutomatically: true)
             
@@ -328,6 +363,9 @@ final class SebbuTSDSQueueTests: XCTestCase {
                 mpmcBoundedQueue1024.enqueue((item: i, thread: 0))
                 mpmcBoundedQueue65536.enqueue((item: i, thread: 0))
                 mpscQueue.enqueue((item: i, thread: 0))
+                mpscBoundedQueue128.enqueue((item: i, thread: 0))
+                mpscBoundedQueue1024.enqueue((item: i, thread: 0))
+                mpscBoundedQueue65536.enqueue((item: i, thread: 0))
                 spinlockedQueue.enqueue((item: i, thread: 0))
                 spinlockedQueueAutomaticResize.enqueue((item: i, thread: 0))
             }
@@ -339,6 +377,9 @@ final class SebbuTSDSQueueTests: XCTestCase {
             mpmcBoundedQueue1024.dequeueAll { _ in }
             mpmcBoundedQueue65536.dequeueAll { _ in }
             mpscQueue.dequeueAll { _ in }
+            mpscBoundedQueue128.dequeueAll { _ in }
+            mpscBoundedQueue1024.dequeueAll { _ in }
+            mpscBoundedQueue65536.dequeueAll { _ in }
             spinlockedQueue.dequeueAll { _ in }
             spinlockedQueueAutomaticResize.dequeueAll { _ in }
             
@@ -350,6 +391,9 @@ final class SebbuTSDSQueueTests: XCTestCase {
             XCTAssertNil(mpmcBoundedQueue1024.dequeue())
             XCTAssertNil(mpmcBoundedQueue65536.dequeue())
             XCTAssertNil(mpscQueue.dequeue())
+            XCTAssertNil(mpscBoundedQueue128.dequeue())
+            XCTAssertNil(mpscBoundedQueue1024.dequeue())
+            XCTAssertNil(mpscBoundedQueue65536.dequeue())
             XCTAssertNil(spinlockedQueue.dequeue())
             XCTAssertNil(spinlockedQueueAutomaticResize.dequeue())
         }

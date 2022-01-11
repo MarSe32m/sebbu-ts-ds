@@ -22,3 +22,19 @@ public protocol ConcurrentQueue {
     @inline(__always)
     func dequeueAll(_ closure: (Element) -> Void)
 }
+
+public extension ConcurrentQueue {
+    @inlinable
+    func blockingEnqueue(_ value: Element) {
+        while !enqueue(value) {}
+    }
+    
+    @inlinable
+    func blockingDequeue() -> Element {
+        while true {
+            if let value = dequeue() {
+                return value
+            }
+        }
+    }
+}

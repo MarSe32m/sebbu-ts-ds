@@ -44,6 +44,7 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @discardableResult
     @inlinable
     public final func enqueue(_ value: Element) -> Bool {
+        //TODO: Can we do something about this allocation?
         let bufferNode = UnsafeMutablePointer<BufferNode>.allocate(capacity: 1)
         bufferNode.initialize(to: BufferNode(data: value))
         
