@@ -26,7 +26,9 @@ final class SebbuTSDSLockTests: XCTestCase {
             }
         }
         while atomicCounter.load(ordering: .relaxed) > 0 {}
-        XCTAssert(counter == 0)
+        spinlock.withLock {
+            XCTAssert(counter == 0)
+        }
     }
     
     func testLockCounting() {
@@ -44,7 +46,9 @@ final class SebbuTSDSLockTests: XCTestCase {
             }
         }
         while atomicCounter.load(ordering: .relaxed) > 0 {}
-        XCTAssert(counter == 0)
+        lock.withLock {
+            XCTAssert(counter == 0)
+        }
     }
     
     func testNSLockCounting() {
@@ -62,7 +66,9 @@ final class SebbuTSDSLockTests: XCTestCase {
             }
         }
         while atomicCounter.load(ordering: .relaxed) > 0 {}
-        XCTAssert(counter == 0)
+        lock.withLock {
+            XCTAssert(counter == 0)
+        }
     }
 }
 #endif

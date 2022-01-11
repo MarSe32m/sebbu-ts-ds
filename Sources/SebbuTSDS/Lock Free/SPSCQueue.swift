@@ -47,6 +47,7 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         node.initialize(to: Node(data: value))
         
         atomicMemoryFence(ordering: .acquiringAndReleasing)
+        // Thread Sanitizer will throw a data race here...
         tail.pointee.next = node
         tail = node
         return true
@@ -55,6 +56,7 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @inlinable
     public final func dequeue() -> Element? {
         atomicMemoryFence(ordering: .acquiring)
+        // Thread sanitizer will throw a data race here...
         if head.pointee.next == nil {
             return nil
         }
