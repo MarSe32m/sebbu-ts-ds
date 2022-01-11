@@ -9,13 +9,12 @@ import Atomics
 
 public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
-    internal class BufferNode {
-        
+    internal struct BufferNode {
         @usableFromInline
         internal var data: Element?
         
         @usableFromInline
-        internal let sequence: ManagedAtomic<Int> = ManagedAtomic<Int>(0)
+        internal let sequence: UnsafeAtomic<Int> = .create(0)
     }
     
     @usableFromInline
@@ -25,7 +24,7 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     internal let mask: Int
     
     @usableFromInline
-    internal var buffer: UnsafeMutableBufferPointer<BufferNode>
+    internal var buffer: UnsafeMutableBufferPointer<UnsafeMutablePointer<BufferNode>>
     
     @usableFromInline
     internal var head = UnsafeAtomic<Int>.create(0)
@@ -43,15 +42,19 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         self.size = _size.nextPowerOf2()
         self.mask = _size.nextPowerOf2() - 1
         self.buffer = UnsafeMutableBufferPointer.allocate(capacity: _size.nextPowerOf2())
-        self.buffer.initialize(repeating: BufferNode())
         for i in 0..<_size.nextPowerOf2() {
-            let node = BufferNode()
-            node.sequence.store(i, ordering: .relaxed)
-            buffer[i] = node
+            let ptr = UnsafeMutablePointer<BufferNode>.allocate(capacity: 1)
+            ptr.initialize(to: BufferNode())
+            ptr.pointee.sequence.store(i, ordering: .relaxed)
+            buffer[i] = ptr
         }
     }
     
     deinit {
+        for item in buffer {
+            item.pointee.sequence.destroy()
+            item.deallocate()
+        }
         buffer.deallocate()
         head.destroy()
         tail.destroy()
@@ -60,12 +63,12 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     @discardableResult
     @inlinable
     public final func enqueue(_ value: Element) -> Bool {
-        var node: BufferNode!
+        var node: UnsafeMutablePointer<BufferNode>!
         var pos = tail.load(ordering: .relaxed)
         
         while true {
             node = buffer[pos & mask]
-            let seq = node.sequence.load(ordering: .acquiring)
+            let seq = node.pointee.sequence.load(ordering: .acquiring)
             let difference = seq - pos
             
             if difference == 0 {
@@ -82,19 +85,19 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
             }
         }
         
-        node.data = value
-        node.sequence.store(pos + 1, ordering: .releasing)
+        node.pointee.data = value
+        node.pointee.sequence.store(pos + 1, ordering: .releasing)
         return true
     }
     
     @inlinable
     public final func dequeue() -> Element? {
-        var node: BufferNode!
+        var node: UnsafeMutablePointer<BufferNode>!
         var pos = head.load(ordering: .relaxed)
         
         while true {
             node = buffer[pos & mask]
-            let seq = node.sequence.load(ordering: .acquiring)
+            let seq = node.pointee.sequence.load(ordering: .acquiring)
             let difference = seq - (pos + 1)
             
             if difference == 0 {
@@ -108,9 +111,9 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
             }
         }
         defer {
-            node.sequence.store(pos + mask + 1, ordering: .releasing)
+            node.pointee.sequence.store(pos + mask + 1, ordering: .releasing)
         }
-        return node.data
+        return node.pointee.data
     }
     
     @inline(__always)

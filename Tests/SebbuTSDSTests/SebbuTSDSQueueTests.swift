@@ -8,7 +8,7 @@ import Atomics
 final class SebbuTSDSQueueTests: XCTestCase {
     private func test<T: ConcurrentQueue>(name: String, queue: T, writers: Int, readers: Int, elements: Int = 10_000) where T.Element == (item: Int, thread: Int) {
         let threadCount = writers + readers
-        let countLock = NSLock()
+        let countLock = Lock()
         var count = 0
         var done = writers
         var accumulatedCount = 0
@@ -47,7 +47,8 @@ final class SebbuTSDSQueueTests: XCTestCase {
         }
         let finalCount = count
         let finalAccumulated = accumulatedCount
-        XCTAssert(finalCount == finalAccumulated, "The queue wasn't deterministic")
+        XCTAssertEqual(finalCount, finalAccumulated, "The queue wasn't deterministic")
+        //XCTAssert(finalCount == finalAccumulated, "The queue wasn't deterministic")
         XCTAssertNil(queue.dequeue())
     }
 
