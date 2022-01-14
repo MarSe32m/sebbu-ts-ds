@@ -166,3 +166,8 @@ internal func testQueueSequenceConformance<T: ConcurrentQueue>(_ queue: T) where
     }
 }
 
+internal func isDebug() -> Bool {
+    var isDebug = false
+    assert({isDebug = true; return true}())
+    return isDebug
+}
