@@ -10,7 +10,6 @@ import Atomics
 public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal struct Node {
-        
         @usableFromInline
         internal var next: UnsafeMutablePointer<Node>?
         
@@ -29,25 +28,31 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal var tail: UnsafeMutablePointer<Node>
     
-    public init() {
-        head = UnsafeMutablePointer<Node>.allocate(capacity: 1)
-        head.initialize(to: Node(data: nil))
-        tail = head
+    @usableFromInline
+    internal let cache: SPSCBoundedQueue<UnsafeMutablePointer<Node>>
+    
+    public init(cacheSize: Int = 128) {
+        let node = UnsafeMutablePointer<Node>.allocate(capacity: 1)
+        node.initialize(to: Node(data: nil))
+        head = node
+        tail = node
+        cache = SPSCBoundedQueue(size: cacheSize)
     }
  
     deinit {
-        while let _ = dequeue() {}
+        while dequeue() != nil {}
+        while let nodePtr = cache.dequeue() {
+            nodePtr.deallocate()
+        }
         tail.deallocate()
     }
     
     @discardableResult
     @inlinable
     public final func enqueue(_ value: Element) -> Bool {
-        let node = UnsafeMutablePointer<Node>.allocate(capacity: 1)
-        node.initialize(to: Node(data: value))
-        
+        let node = allocateNode()
+        node.pointee.data = value
         atomicMemoryFence(ordering: .acquiringAndReleasing)
-        // Thread Sanitizer will throw a data race here...
         tail.pointee.next = node
         tail = node
         return true
@@ -64,7 +69,9 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         atomicMemoryFence(ordering: .acquiringAndReleasing)
         let front = head
         head = front.pointee.next!
-        front.deallocate()
+        if (!cache.enqueue(front)) {
+            front.deallocate()
+        }
         return result
     }
     
@@ -74,17 +81,36 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
             closure(element)
         }
     }
+    
+    @inlinable
+    internal final func allocateNode() -> UnsafeMutablePointer<Node> {
+        if let node = cache.dequeue() {
+            node.pointee.next = nil
+            return node
+        }
+        let node: UnsafeMutablePointer<Node> = .allocate(capacity: 1)
+        node.initialize(to: Node(data: nil))
+        return node
+    }
 }
 
 extension SPSCQueue: Sequence {
     public struct Iterator: IteratorProtocol {
+        @usableFromInline
         internal let queue: SPSCQueue
         
+        @inlinable
+        internal init(queue: SPSCQueue) {
+            self.queue = queue
+        }
+        
+        @inlinable
         public func next() -> Element? {
             queue.dequeue()
         }
     }
     
+    @inlinable
     public func makeIterator() -> Iterator {
         Iterator(queue: self)
     }

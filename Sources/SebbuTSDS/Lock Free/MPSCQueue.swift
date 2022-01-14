@@ -14,7 +14,7 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         internal var data: Element?
         
         @usableFromInline
-        internal let next: UnsafeAtomic<UnsafeMutablePointer<BufferNode>?> = UnsafeAtomic.create(nil)
+        internal let next: UnsafeAtomic<UnsafeMutablePointer<BufferNode>?> = .create(nil)
         
         @usableFromInline
         internal init(data: Element?) {
@@ -23,31 +23,37 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     }
     
     @usableFromInline
-    internal var head: ManagedAtomic<UnsafeMutablePointer<BufferNode>>
+    internal let head: UnsafeAtomic<UnsafeMutablePointer<BufferNode>>
     
     @usableFromInline
-    internal var tail: ManagedAtomic<UnsafeMutablePointer<BufferNode>>
+    internal let tail: UnsafeAtomic<UnsafeMutablePointer<BufferNode>>
+    
+    @usableFromInline
+    internal let cache: SPMCBoundedQueue<UnsafeMutablePointer<BufferNode>>
     
     @inlinable
-    public init() {
+    public init(cacheSize: Int = 1024) {
         let node = UnsafeMutablePointer<BufferNode>.allocate(capacity: 1)
         node.initialize(to: BufferNode(data: nil))
-        self.head = ManagedAtomic<UnsafeMutablePointer<BufferNode>>(node)
-        self.tail = ManagedAtomic<UnsafeMutablePointer<BufferNode>>(node)
+        self.head = .create(node)
+        self.tail = .create(node)
+        self.cache = SPMCBoundedQueue(size: cacheSize)
     }
     
     deinit {
         while let _ = dequeue() {}
+        tail.load(ordering: .relaxed).pointee.next.destroy()
+        tail.load(ordering: .relaxed).deinitialize(count: 1)
         tail.load(ordering: .relaxed).deallocate()
+        head.destroy()
+        tail.destroy()
     }
     
     @discardableResult
     @inlinable
     public final func enqueue(_ value: Element) -> Bool {
-        //TODO: Can we do something about this allocation?
-        let bufferNode = UnsafeMutablePointer<BufferNode>.allocate(capacity: 1)
-        bufferNode.initialize(to: BufferNode(data: value))
-        
+        let bufferNode = allocateNode()
+        bufferNode.pointee.data = value
         let previous = tail.exchange(bufferNode, ordering: .acquiringAndReleasing)
         previous.pointee.next.store(bufferNode, ordering: .releasing)
         return true
@@ -61,8 +67,10 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         }
         let result = next.pointee.data
         head.store(next, ordering: .releasing)
-        currentHead.pointee.next.destroy()
-        currentHead.deallocate()
+        if !cache.enqueue(currentHead) {
+            currentHead.pointee.next.destroy()
+            currentHead.deallocate()
+        }
         return result
     }
     
@@ -72,17 +80,36 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
             closure(element)
         }
     }
+    
+    @inlinable
+    internal final func allocateNode() -> UnsafeMutablePointer<BufferNode> {
+        if let node = cache.dequeue() {
+            node.pointee.next.store(nil, ordering: .relaxed)
+            return node
+        }
+        let node: UnsafeMutablePointer<BufferNode> = .allocate(capacity: 1)
+        node.initialize(to: BufferNode(data: nil))
+        return node
+    }
 }
 
 extension MPSCQueue: Sequence {
     public struct Iterator: IteratorProtocol {
+        @usableFromInline
         internal let queue: MPSCQueue
         
+        @inlinable
+        internal init(queue: MPSCQueue) {
+            self.queue = queue
+        }
+        
+        @inlinable
         public func next() -> Element? {
             queue.dequeue()
         }
     }
     
+    @inlinable
     public func makeIterator() -> Iterator {
         Iterator(queue: self)
     }

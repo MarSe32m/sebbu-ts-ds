@@ -1,14 +1,14 @@
 //
-//  MPSCBoundedQueue.swift
-//  
+//  SPMCBoundedQueue.swift
 //
-//  Created by Sebastian Toivonen on 11.1.2022.
+//
+//  Created by Sebastian Toivonen on 13.1.2022.
 //
 
 #if canImport(Atomics)
 import Atomics
 
-public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
+public final class SPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal struct BufferNode {
         @usableFromInline
@@ -25,18 +25,18 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     internal let mask: Int
     
     @usableFromInline
-    internal let _buffer: UnsafeMutableBufferPointer<BufferNode>
+    internal var _buffer: UnsafeMutableBufferPointer<BufferNode>
     
     @usableFromInline
-    internal var head: Int = 0
+    internal let head = UnsafeAtomic<Int>.create(0)
     
     @usableFromInline
-    internal let tail = UnsafeAtomic<Int>.create(0)
+    internal var tail = 0
     
     public var count: Int {
-        let headIndex = head
-        let tailIndex = tail.load(ordering: .relaxed)
-        return tailIndex < headIndex ? (_buffer.count - headIndex + tailIndex) : (tailIndex - headIndex)
+        let headIndex = head.load(ordering: .relaxed)
+        let tailIndex = tail
+        return tailIndex < headIndex ? (size - headIndex + tailIndex) : (tailIndex - headIndex)
     }
     
     public init(size: Int) {
@@ -46,7 +46,7 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         self._buffer = .allocate(capacity: size)
         for i in 0..<size {
             _buffer[i] = BufferNode()
-            _buffer[i].sequence.store(i, ordering: .relaxed)
+            _buffer[i].sequence.store(i, ordering: .releasing)
         }
     }
     
@@ -55,32 +55,21 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
             item.sequence.destroy()
         }
         _buffer.deallocate()
-        tail.destroy()
+        head.destroy()
     }
     
     @discardableResult
     @inlinable
     public final func enqueue(_ value: Element) -> Bool {
-        var node: UnsafeMutablePointer<BufferNode>!
-        var pos = tail.load(ordering: .relaxed)
+        let pos = tail
+        let node: UnsafeMutablePointer<BufferNode> = _buffer.baseAddress!.advanced(by: pos & mask)
+        let seq = node.pointee.sequence.load(ordering: .acquiring)
+        let difference = seq - pos
         
-        while true {
-            node = _buffer.baseAddress?.advanced(by: pos & mask)
-            let seq = node.pointee.sequence.load(ordering: .acquiring)
-            let difference = seq - pos
-            
-            if difference == 0 {
-                if tail.weakCompareExchange(expected: pos,
-                                            desired: pos + 1,
-                                            successOrdering: .relaxed,
-                                            failureOrdering: .relaxed).exchanged {
-                    break
-                }
-            } else if difference < 0 {
-                return false
-            } else {
-                pos = tail.load(ordering: .relaxed)
-            }
+        if difference == 0 {
+            tail += 1
+        } else if difference < 0 {
+            return false
         }
         
         node.pointee.data = value
@@ -90,16 +79,24 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     
     @inlinable
     public final func dequeue() -> Element? {
-        let pos = head
-        let node: UnsafeMutablePointer<BufferNode> = _buffer.baseAddress!.advanced(by: pos & mask)
-        let seq = node.pointee.sequence.load(ordering: .acquiring)
-        let difference = seq - (pos + 1)
-        if difference == 0 {
-            head += 1
-        } else if difference < 0 {
-            return nil
-        }
+        var node: UnsafeMutablePointer<BufferNode>!
+        var pos = head.load(ordering: .relaxed)
         
+        while true {
+            node = _buffer.baseAddress!.advanced(by: pos & mask)
+            let seq = node.pointee.sequence.load(ordering: .acquiring)
+            let difference = seq - (pos + 1)
+            
+            if difference == 0 {
+                if head.weakCompareExchange(expected: pos, desired: pos + 1, successOrdering: .relaxed, failureOrdering: .relaxed).exchanged {
+                    break
+                }
+            } else if difference < 0 {
+                return nil
+            } else {
+                pos = head.load(ordering: .relaxed)
+            }
+        }
         defer {
             node.pointee.sequence.store(pos + mask + 1, ordering: .releasing)
         }
@@ -114,13 +111,13 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     }
 }
 
-extension MPSCBoundedQueue: Sequence {
+extension SPMCBoundedQueue: Sequence {
     public struct Iterator: IteratorProtocol {
         @usableFromInline
-        internal let queue: MPSCBoundedQueue
+        internal let queue: SPMCBoundedQueue
         
         @inlinable
-        internal init(queue: MPSCBoundedQueue) {
+        internal init(queue: SPMCBoundedQueue) {
             self.queue = queue
         }
         
@@ -136,4 +133,3 @@ extension MPSCBoundedQueue: Sequence {
     }
 }
 #endif
-

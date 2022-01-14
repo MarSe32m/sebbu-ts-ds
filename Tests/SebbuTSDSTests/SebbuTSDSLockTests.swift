@@ -21,7 +21,7 @@ final class SebbuTSDSLockTests: XCTestCase {
                     spinlock.withLock {
                         counter -= 1
                     }
-                    atomicCounter.wrappingDecrement(ordering: .sequentiallyConsistent)
+                    atomicCounter.wrappingDecrement(ordering: .relaxed)
                 }
             }
         }
@@ -41,7 +41,7 @@ final class SebbuTSDSLockTests: XCTestCase {
                     lock.withLock {
                         counter -= 1
                     }
-                    atomicCounter.wrappingDecrement(ordering: .sequentiallyConsistent)
+                    atomicCounter.wrappingDecrement(ordering: .relaxed)
                 }
             }
         }
@@ -61,7 +61,7 @@ final class SebbuTSDSLockTests: XCTestCase {
                     lock.withLock {
                         counter -= 1
                     }
-                    atomicCounter.wrappingDecrement(ordering: .sequentiallyConsistent)
+                    atomicCounter.wrappingDecrement(ordering: .relaxed)
                 }
             }
         }
