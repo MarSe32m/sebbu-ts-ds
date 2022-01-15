@@ -24,10 +24,10 @@ public final class ThreadPool {
     
     public let numberOfThreads: Int
     
-    public init(numberOfThreads: Int) {
+    public init(numberOfThreads: Int, workerThreadCacheSize: Int = 2048) {
         self.numberOfThreads = numberOfThreads
         for _ in 0..<numberOfThreads {
-            workers.append(WorkerThread(queueCacheSize: 2048))
+            workers.append(WorkerThread(queueCacheSize: workerThreadCacheSize))
         }
     }
     
