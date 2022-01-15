@@ -24,7 +24,7 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     internal let mask: Int
     
     @usableFromInline
-    internal let _buffer: UnsafeMutableBufferPointer<BufferNode>
+    internal let buffer: UnsafeMutableBufferPointer<UnsafeMutablePointer<BufferNode>>
     
     @usableFromInline
     internal var head = UnsafeAtomic<Int>.create(0)
@@ -42,18 +42,21 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         let size = size.nextPowerOf2()
         self.size = size
         self.mask = size - 1
-        self._buffer = UnsafeMutableBufferPointer<BufferNode>.allocate(capacity: size)
+        self.buffer = .allocate(capacity: size)
         for i in 0..<size {
-            _buffer[i] = BufferNode()
-            _buffer[i].sequence.store(i, ordering: .relaxed)
+            let ptr = UnsafeMutablePointer<BufferNode>.allocate(capacity: 1)
+            ptr.initialize(to: BufferNode(data: nil))
+            ptr.pointee.sequence.store(i, ordering: .relaxed)
+            buffer[i] = ptr
         }
     }
     
     deinit {
-        for item in _buffer {
-            item.sequence.destroy()
+        for item in buffer {
+            item.pointee.sequence.destroy()
+            item.deallocate()
         }
-        _buffer.deallocate()
+        buffer.deallocate()
         head.destroy()
         tail.destroy()
     }
@@ -65,7 +68,7 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         var pos = tail.load(ordering: .relaxed)
         
         while true {
-            node = _buffer.baseAddress?.advanced(by: pos & mask)
+            node = buffer[pos & mask]
             let seq = node.pointee.sequence.load(ordering: .acquiring)
             let difference = seq - pos
             
@@ -94,7 +97,7 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         var pos = head.load(ordering: .relaxed)
         
         while true {
-            node = _buffer.baseAddress?.advanced(by: pos & mask)
+            node = buffer[pos & mask]
             let seq = node.pointee.sequence.load(ordering: .acquiring)
             let difference = seq - (pos + 1)
             

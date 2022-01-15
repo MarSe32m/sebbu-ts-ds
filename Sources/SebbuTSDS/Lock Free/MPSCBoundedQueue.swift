@@ -45,7 +45,7 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         self.mask = size - 1
         self._buffer = .allocate(capacity: size)
         for i in 0..<size {
-            _buffer[i] = BufferNode()
+            _buffer.baseAddress?.advanced(by: i).initialize(to: BufferNode(data: nil))
             _buffer[i].sequence.store(i, ordering: .relaxed)
         }
     }

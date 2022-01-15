@@ -80,7 +80,7 @@ final class SebbuTSDSLockedBenchmarks: XCTestCase {
         }
         measure {
             for i in 0..<1000 {
-                queue.append(i)
+            queue.append(i)
             }
             for _ in 0..<1000 {
                 _ = queue.popFirst()
