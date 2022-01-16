@@ -16,11 +16,14 @@ import Glibc
 
 public final class Lock: @unchecked Sendable {
 #if os(Windows)
-    private let mutex: UnsafeMutablePointer<SRWLOCK> = UnsafeMutablePointer.allocate(capacity: 1)
+    @usableFromInline
+    internal let mutex: UnsafeMutablePointer<SRWLOCK> = UnsafeMutablePointer.allocate(capacity: 1)
 #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    private let mutex: os_unfair_lock_t = os_unfair_lock_t.allocate(capacity: 1)
+    @usableFromInline
+    internal let mutex: os_unfair_lock_t = os_unfair_lock_t.allocate(capacity: 1)
 #else
-    private let mutex: UnsafeMutablePointer<pthread_mutex_t> = UnsafeMutablePointer.allocate(capacity: 1)
+    @usableFromInline
+    internal let mutex: UnsafeMutablePointer<pthread_mutex_t> = UnsafeMutablePointer.allocate(capacity: 1)
 #endif
     
     public init() {
@@ -43,6 +46,7 @@ public final class Lock: @unchecked Sendable {
         self.mutex.deallocate()
     }
     
+    @inlinable
     public final func lock() {
 #if os(Windows)
         AcquireSRWLockExclusive(self.mutex)
@@ -54,6 +58,7 @@ public final class Lock: @unchecked Sendable {
 #endif
     }
     
+    @inlinable
     public final func unlock() {
 #if os(Windows)
         ReleaseSRWLockExclusive(self.mutex)
