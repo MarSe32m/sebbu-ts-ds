@@ -18,9 +18,11 @@ public final class ThreadPool {
     // enqueued to a specific thread, while the other threads
     // run short computations and when done, have to wait for
     // more work...
-    private let workerIndex = UnsafeAtomic<Int>.create(0)
+    @usableFromInline
+    internal let workerIndex = UnsafeAtomic<Int>.create(0)
     
-    private var workers: [WorkerThread] = []
+    @usableFromInline
+    internal var workers: [WorkerThread] = []
     
     public let numberOfThreads: Int
     
@@ -31,19 +33,22 @@ public final class ThreadPool {
         }
     }
     
+    @inlinable
     public final func start() {
         workers.forEach {$0.run()}
     }
     
+    @inlinable
     public final func run(_ block: @escaping () -> ()) {
         var index = workerIndex.loadThenWrappingIncrement(ordering: .relaxed)
         if _slowPath(index < 0) {
-            workerIndex.store(Int.random(in: 0...numberOfThreads), ordering: .relaxed)
-            index = workerIndex.loadThenWrappingIncrement(ordering: .relaxed)
+            workerIndex.store(0, ordering: .relaxed)
+            index = workerIndex.wrappingIncrementThenLoad(ordering: .relaxed)
         }
         workers[index % numberOfThreads].submit(block)
     }
     
+    @inlinable
     public final func stop() {
         workers.forEach { $0.stop() }
     }
@@ -65,12 +70,15 @@ internal final class WorkerThread {
         workQueue = MPSCQueue(cacheSize: queueCacheSize)
     }
     
+    @inline(__always)
     public final func submit(_ work: @escaping () -> ()) {
         workQueue.enqueue(work)
         semaphore.signal()
     }
     
+    @inlinable
     public final func run() {
+        running.store(true, ordering: .relaxed)
         Thread.detachNewThread {
             let maxIterations = 1000
             while self.running.load(ordering: .relaxed) {
@@ -87,6 +95,7 @@ internal final class WorkerThread {
         }
     }
     
+    @inlinable
     public final func stop() {
         running.store(false, ordering: .relaxed)
         semaphore.signal()
@@ -94,6 +103,9 @@ internal final class WorkerThread {
     
     deinit {
         running.destroy()
+        workQueue.dequeueAll { work in
+            work()
+        }
     }
 }
 #endif
