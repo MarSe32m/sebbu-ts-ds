@@ -42,8 +42,10 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     deinit {
         while dequeue() != nil {}
         while let nodePtr = cache.dequeue() {
+            nodePtr.deinitialize(count: 1)
             nodePtr.deallocate()
         }
+        tail.deinitialize(count: 1)
         tail.deallocate()
     }
     
@@ -70,6 +72,7 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         let front = head
         head = front.pointee.next!
         if (!cache.enqueue(front)) {
+            front.deinitialize(count: 1)
             front.deallocate()
         }
         return result

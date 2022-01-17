@@ -44,9 +44,11 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         while let _ = dequeue() {}
         while let node = cache.dequeue() {
             node.pointee.next.destroy()
+            node.deinitialize(count: 1)
             node.deallocate()
         }
         tail.load(ordering: .relaxed).pointee.next.destroy()
+        tail.load(ordering: .relaxed).deinitialize(count: 1)
         tail.load(ordering: .relaxed).deallocate()
         head.destroy()
         tail.destroy()
@@ -72,6 +74,7 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         head.store(next, ordering: .releasing)
         if !cache.enqueue(currentHead) {
             currentHead.pointee.next.destroy()
+            currentHead.deinitialize(count: 1)
             currentHead.deallocate()
         }
         return result

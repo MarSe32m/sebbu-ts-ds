@@ -60,6 +60,7 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
     }
     
     deinit {
+        buffer.baseAddress?.deinitialize(count: buffer.count)
         buffer.deallocate()
     }
     
@@ -136,6 +137,7 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
     public func resize(to newSize: Int) {
         lock.lock(); defer { lock.unlock() }
         let size = newSize.nextPowerOf2()
+        buffer.baseAddress?.deinitialize(count: buffer.count)
         buffer.deallocate()
         buffer = UnsafeMutableBufferPointer.allocate(capacity: size)
         buffer.initialize(repeating: nil)
@@ -156,6 +158,7 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
         tailIndex = buffer.count - 1
         headIndex = 0
         swap(&buffer, &newBuffer)
+        newBuffer.baseAddress?.deinitialize(count: newBuffer.count)
         newBuffer.deallocate()
     }
 }

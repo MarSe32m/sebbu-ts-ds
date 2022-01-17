@@ -9,6 +9,82 @@ import SebbuTSDS
 import Dispatch
 import XCTest
 
+internal class Object {
+    let age: Int
+    
+    init(_ age: Int) {
+        self.age = age
+    }
+}
+
+internal func test<T: ConcurrentQueue>(queue: T, singleWriter: Bool, singleReader: Bool) where T.Element == Object {
+    if singleReader && !singleWriter {
+        DispatchQueue.concurrentPerform(iterations: 8) { i in
+            if i == 0 {
+                for _ in 0..<7 * 10000 {
+                    while true {
+                        if queue.dequeue() != nil {
+                            break
+                        }
+                    }
+                }
+            } else {
+                for j in 0..<10000 {
+                    while !queue.enqueue(Object(j)){}
+                }
+            }
+        }
+    } else if singleWriter && !singleReader {
+        DispatchQueue.concurrentPerform(iterations: 8) { i in
+            if i == 0 {
+                for j in 0..<10000 * 7 {
+                    while !queue.enqueue(Object(j)){}
+                }
+            } else {
+                for _ in 0..<10000 {
+                    while true {
+                        if queue.dequeue() != nil {
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    } else if singleWriter && singleReader {
+        DispatchQueue.concurrentPerform(iterations: 2) { i in
+            if i == 0 {
+                for j in 0..<10000 * 7 {
+                    while !queue.enqueue(Object(j)){}
+                }
+            } else {
+                for _ in 0..<10000 * 7 {
+                    while true {
+                        if queue.dequeue() != nil {
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        DispatchQueue.concurrentPerform(iterations: 8) { i in
+            if i % 2 == 0 {
+                for i in 0..<10000 {
+                    _ = queue.enqueue(Object(i))
+                }
+            } else {
+                for _ in 0..<10000 {
+                    while true {
+                        if queue.dequeue() != nil {
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 internal func test<T: ConcurrentQueue>(queue: T, writers: Int, readers: Int, elements: Int = 10_000) where T.Element == (item: Int, thread: Int) {
     let threadCount = writers + readers
     let countLock = Lock()

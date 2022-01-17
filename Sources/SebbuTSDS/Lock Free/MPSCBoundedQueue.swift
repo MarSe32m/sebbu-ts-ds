@@ -12,10 +12,15 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     @usableFromInline
     internal struct BufferNode {
         @usableFromInline
-        internal var data: Element?
+        internal var data: UnsafeMutablePointer<Element?>
         
         @usableFromInline
         internal let sequence: UnsafeAtomic<Int> = .create(0)
+        
+        init(data: Element?) {
+            self.data = .allocate(capacity: 1)
+            self.data.initialize(to: data)
+        }
     }
     
     @usableFromInline
@@ -53,6 +58,8 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     deinit {
         for item in _buffer {
             item.sequence.destroy()
+            item.data.deinitialize(count: 1)
+            item.data.deallocate()
         }
         _buffer.deallocate()
         tail.destroy()
@@ -83,7 +90,7 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
             }
         }
         
-        node.pointee.data = value
+        node.pointee.data.pointee = value
         node.pointee.sequence.store(pos + 1, ordering: .releasing)
         return true
     }
@@ -103,7 +110,7 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         defer {
             node.pointee.sequence.store(pos + mask + 1, ordering: .releasing)
         }
-        return node.pointee.data
+        return node.pointee.data.pointee
     }
     
     @inline(__always)

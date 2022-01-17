@@ -23,6 +23,9 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
         test(queue: SPSCBoundedQueue<(item: Int, thread: Int)>(size: 1_000_000), writers: 1, readers: 1, elements: 10_000_000)
         
         testQueueSequenceConformance(SPSCBoundedQueue<Int>(size: 1_000))
+        
+        let queueOfReferenceTypes = SPSCBoundedQueue<Object>(size: 50000)
+        test(queue: queueOfReferenceTypes, singleWriter: true, singleReader: true)
 #endif
     }
     
@@ -41,6 +44,8 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
         test(queue: SPSCQueue<(item: Int, thread: Int)>(cacheSize: 65536), writers: 1, readers: 1, elements: 10_000_000)
         
         testQueueSequenceConformance(SPSCQueue<Int>())
+        let queueOfReferenceTypes = SPSCQueue<Object>()
+        test(queue: queueOfReferenceTypes, singleWriter: true, singleReader: true)
 #endif
     }
     
@@ -64,6 +69,8 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
         }
         
         testQueueSequenceConformance(MPMCBoundedQueue<Int>(size: 1000))
+        let queueOfReferenceTypes = MPMCBoundedQueue<Object>(size: 50000)
+        test(queue: queueOfReferenceTypes, singleWriter: false, singleReader: false)
 #endif
     }
     
@@ -76,6 +83,9 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
         }
         
         testQueueSequenceConformance(SPMCBoundedQueue<Int>(size: 1000))
+        
+        let queueOfReferenceTypes = SPMCBoundedQueue<Object>(size: 50000)
+        test(queue: queueOfReferenceTypes, singleWriter: true, singleReader: false)
 #endif
     }
     
@@ -88,6 +98,8 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
         }
         
         testQueueSequenceConformance(MPSCQueue<Int>())
+        let queueOfReferenceTypes = MPSCQueue<Object>()
+        test(queue: queueOfReferenceTypes, singleWriter: false, singleReader: true)
 #endif
     }
     
@@ -97,6 +109,9 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
             test(queue: MPSCBoundedQueue<(item: Int, thread: Int)>(size: 10000), writers: i - 1, readers: 1, elements: 1_000_00)
         }
         testQueueSequenceConformance(MPSCBoundedQueue<Int>(size: 10000))
+        
+        let queueOfReferenceTypes = MPSCBoundedQueue<Object>(size: 50000)
+        test(queue: queueOfReferenceTypes, singleWriter: false, singleReader: true)
 #endif
     }
     

@@ -15,7 +15,7 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     internal let mask: Int
     
     @usableFromInline
-    internal var buffer: UnsafeMutableBufferPointer<Element>
+    internal var buffer: UnsafeMutableBufferPointer<Element?>
     
     @usableFromInline
     internal let head = UnsafeAtomic<Int>.create(0)
@@ -41,9 +41,11 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         self.size = size.nextPowerOf2()
         self.mask = size.nextPowerOf2() - 1
         self.buffer = UnsafeMutableBufferPointer.allocate(capacity: size.nextPowerOf2() + 1)
+        self.buffer.initialize(repeating: nil)
     }
     
     deinit {
+        buffer.baseAddress?.deinitialize(count: size)
         buffer.deallocate()
         head.destroy()
         tail.destroy()

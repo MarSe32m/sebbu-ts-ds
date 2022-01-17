@@ -17,6 +17,9 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
             test(queue: lockedQueue, writers: i - 1, readers: 1, elements: 1_000_00)
             test(queue: lockedQueueAutomaticResize, writers: i - 1, readers: 1, elements: 1_000_00)
         }
+        
+        let queueOfReferenceTypes = LockedQueue<Object>(size: 50000)
+        test(queue: queueOfReferenceTypes, singleWriter: false, singleReader: false)
     }
     
     func testLockedQueueSequenceConformance() {
@@ -74,6 +77,9 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
             test(queue: spinlockedQueue, writers: i - 1, readers: 1, elements: 1_000_00)
             test(queue: spinlockedQueueAutomaticResize, writers: i - 1, readers: 1, elements: 1_000_00)
         }
+        
+        let queueOfReferenceTypes = SpinlockedQueue<Object>(size: 50000)
+        test(queue: queueOfReferenceTypes, singleWriter: false, singleReader: false)
 #endif
     }
     
