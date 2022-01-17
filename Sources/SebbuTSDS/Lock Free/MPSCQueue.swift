@@ -42,8 +42,11 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     
     deinit {
         while let _ = dequeue() {}
+        while let node = cache.dequeue() {
+            node.pointee.next.destroy()
+            node.deallocate()
+        }
         tail.load(ordering: .relaxed).pointee.next.destroy()
-        tail.load(ordering: .relaxed).deinitialize(count: 1)
         tail.load(ordering: .relaxed).deallocate()
         head.destroy()
         tail.destroy()

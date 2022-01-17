@@ -59,5 +59,27 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         while counter.load(ordering: .relaxed) != 0 {}
         threadPool.stop()
     }
+    
+    func testThreadPoolWorkStealing() {
+        let enqueueCount = 1000
+        let threadPool = ThreadPool(numberOfThreads: 10)
+        threadPool.start()
+        let counter = ManagedAtomic<Int>(enqueueCount)
+        for i in 0..<enqueueCount {
+            threadPool.run {
+                if i % 10 == 0 {
+                    // Since the enqueueing strategy is round robin, we load the first thread with
+                    // "heavy computation" work
+                    Thread.sleep(forTimeInterval: 0.1)
+                }
+                counter.wrappingDecrement(ordering: .relaxed)
+            }
+        }
+        let start = DispatchTime.now().uptimeNanoseconds
+        while counter.load(ordering: .relaxed) != 0 {}
+        let end = DispatchTime.now().uptimeNanoseconds
+        threadPool.stop()
+        XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 1.1)
+    }
 }
 #endif

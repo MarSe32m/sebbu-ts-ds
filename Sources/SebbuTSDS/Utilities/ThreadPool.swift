@@ -22,20 +22,24 @@ public final class ThreadPool {
     internal let workerIndex = UnsafeAtomic<Int>.create(0)
     
     @usableFromInline
-    internal var workers: [WorkerThread] = []
+    internal var workers: [Worker] = []
     
     public let numberOfThreads: Int
     
-    public init(numberOfThreads: Int, workerThreadCacheSize: Int = 2048) {
+    public init(numberOfThreads: Int, workerThreadCacheSize: Int = 4096) {
         self.numberOfThreads = numberOfThreads
         for _ in 0..<numberOfThreads {
-            workers.append(WorkerThread(queueCacheSize: workerThreadCacheSize))
+            workers.append(Worker(queueCacheSize: workerThreadCacheSize))
         }
     }
     
     @inlinable
     public final func start() {
-        workers.forEach {$0.run()}
+        for worker in workers {
+            Thread.detachNewThread {
+                worker.start(threadPool: self)
+            }
+        }
     }
     
     @inlinable
@@ -59,40 +63,86 @@ public final class ThreadPool {
 }
 
 @usableFromInline
-internal final class WorkerThread {
+internal final class Worker {
+    @usableFromInline
     typealias Work = () -> ()
     
     public let workQueue: MPSCQueue<Work>
+    public let stealableWorkQueue: MPMCBoundedQueue<Work>
+    
     public let semaphore: DispatchSemaphore = .init(value: 0)
-    public let running: UnsafeAtomic<Bool> = .create(true)
+    public let running: UnsafeAtomic<Bool> = .create(false)
+    
+    public let workCount: UnsafeAtomic<Int> = .create(0)
     
     init(queueCacheSize: Int) {
         workQueue = MPSCQueue(cacheSize: queueCacheSize)
+        stealableWorkQueue = MPMCBoundedQueue(size: queueCacheSize)
     }
     
     @inline(__always)
     public final func submit(_ work: @escaping () -> ()) {
-        workQueue.enqueue(work)
+        workCount.wrappingIncrement(ordering: .relaxed)
+        if !stealableWorkQueue.enqueue(work) {
+            workQueue.enqueue(work)
+        }
         semaphore.signal()
     }
     
+    @inline(__always)
+    public final func start(threadPool: ThreadPool) {
+        self.run(threadPool: threadPool)
+    }
+    
     @inlinable
-    public final func run() {
+    public final func run(threadPool: ThreadPool) {
+        // If the value was already true, then don't run again...
+        if running.exchange(true, ordering: .relaxed) { return }
         running.store(true, ordering: .relaxed)
-        Thread.detachNewThread {
-            let maxIterations = 1000
-            while self.running.load(ordering: .relaxed) {
-                var iterations = 0
-                while iterations < maxIterations {
-                    while let work = self.workQueue.dequeue() {
-                        work()
-                        iterations = 0
-                    }
-                    iterations += 1
+        let maxIterations = 1000
+        while running.load(ordering: .relaxed) {
+            var iterations = 0
+            var workLeft = 0
+            while iterations < maxIterations {
+                if let work = stealableWorkQueue.dequeue() {
+                    workLeft = workCount.wrappingDecrementThenLoad(ordering: .relaxed)
+                    work()
+                    iterations = 0
                 }
-                self.semaphore.wait()
+                if let work = workQueue.dequeue() {
+                    workLeft = workCount.wrappingDecrementThenLoad(ordering: .relaxed)
+                    work()
+                    iterations = 0
+                }
+                if workLeft > 0 {
+                    while let work = workQueue.dequeue() {
+                        if !stealableWorkQueue.enqueue(work) {
+                            workLeft = workCount.wrappingDecrementThenLoad(ordering: .relaxed)
+                            work()
+                            break
+                        }
+                    }
+                }
+                iterations += 1
             }
+            
+            // Steal other workers work
+            for worker in threadPool.workers {
+                while let work = worker.steal() {
+                    work()
+                }
+            }
+            semaphore.wait()
         }
+    }
+    
+    @inlinable
+    public final func steal() -> Work? {
+        if let work = stealableWorkQueue.dequeue() {
+            workCount.wrappingDecrement(ordering: .relaxed)
+            return work
+        }
+        return nil
     }
     
     @inlinable
@@ -102,10 +152,14 @@ internal final class WorkerThread {
     }
     
     deinit {
-        running.destroy()
+        stealableWorkQueue.dequeueAll { work in
+            work()
+        }
         workQueue.dequeueAll { work in
             work()
         }
+        running.destroy()
+        workCount.destroy()
     }
 }
 #endif
