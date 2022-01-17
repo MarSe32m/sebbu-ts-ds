@@ -16,13 +16,13 @@ jobs:
     - name: Swift Version
       run: swift --version
     - name: Build (Debug)
-      run: swift build -v -c debug
+      run: swift build -c debug
     - name: Build (Release)
-      run: swift build -v -c release
-    - name: Test (Debug)
-      run: swift test -v --configuration debug --enable-test-discovery
+      run: swift build -c release
     - name: Test (Release)
-      run: swift test -v --configuration release --enable-test-discovery -Xswiftc -enable-testing
+      run: swift test -c release
+    - name: Test (Debug)
+      run: swift test -c debug
     
   linux-swift-53:
     name: Linux x86_64 (Swift 5.5)
@@ -34,13 +34,13 @@ jobs:
     - name: Swift Version
       run: swift --version
     - name: Build (Debug)
-      run: swift build -v -c debug --enable-test-discovery
+      run: swift build -c debug
     - name: Build (Release)
-      run: swift build -v -c release --enable-test-discovery
-    - name: Test (Debug)
-      run: swift test -v --configuration debug --enable-test-discovery
+      run: swift build -c release
     - name: Test (Release)
-      run: swift test -v --configuration release --enable-test-discovery -Xswiftc -enable-testing
+      run: swift test -c release
+    - name: Test (Debug)
+      run: swift test -c debug
     
   windows-swift-latest:
     name: Windows
@@ -64,10 +64,10 @@ jobs:
     - name: Swift Version
       run: swift --version
     - name: Build (Debug)
-      run: swift build -v -c debug
+      run: swift build -c debug
     - name: Build (Release)
-      run: swift build -v -c release
+      run: swift build -c release
     - name: Test (Debug)
-      run: swift test -v --configuration debug --enable-test-discovery
+      run: swift test -v -c
     - name: Test (Release)
-      run: swift test -v --configuration release --enable-test-discovery -Xswiftc -enable-testing
+      run: swift test -c release
