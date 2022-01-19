@@ -45,6 +45,7 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     }
     
     deinit {
+        while dequeue() != nil {}
         buffer.baseAddress?.deinitialize(count: size)
         buffer.deallocate()
         head.destroy()

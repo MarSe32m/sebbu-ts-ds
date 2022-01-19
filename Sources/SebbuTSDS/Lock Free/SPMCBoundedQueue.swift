@@ -56,6 +56,7 @@ public final class SPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     }
     
     deinit {
+        while dequeue() != nil {}
         for item in _buffer {
             item.sequence.destroy()
             item.data.deinitialize(count: 1)
