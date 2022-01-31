@@ -38,7 +38,7 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         tail = node
         cache = SPSCBoundedQueue(size: cacheSize)
     }
- 
+
     deinit {
         while dequeue() != nil {}
         while let nodePtr = cache.dequeue() {

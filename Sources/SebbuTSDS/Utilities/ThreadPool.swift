@@ -58,6 +58,7 @@ public final class ThreadPool {
     }
     
     deinit {
+        stop()
         workerIndex.destroy()
     }
 }
@@ -82,8 +83,7 @@ internal final class Worker {
     
     @inline(__always)
     public final func submit(_ work: @escaping () -> ()) {
-        workCount.wrappingIncrement(ordering: .relaxed)
-        if !stealableWorkQueue.enqueue(work) {
+        if stealableWorkQueue.wasFull || !stealableWorkQueue.enqueue(work) {
             workQueue.enqueue(work)
         }
         semaphore.signal()
@@ -98,39 +98,31 @@ internal final class Worker {
     public final func run(threadPool: ThreadPool) {
         // If the value was already true, then don't run again...
         if running.exchange(true, ordering: .relaxed) { return }
-        running.store(true, ordering: .relaxed)
-        let maxIterations = 1000
+        let maxIterations = 1024
+        let stealableWork = WorkIterator(threadPool.workers)
         while running.load(ordering: .relaxed) {
             var iterations = 0
-            var workLeft = 0
             while iterations < maxIterations {
                 if let work = stealableWorkQueue.dequeue() {
-                    workLeft = workCount.wrappingDecrementThenLoad(ordering: .relaxed)
                     work()
                     iterations = 0
                 }
                 if let work = workQueue.dequeue() {
-                    workLeft = workCount.wrappingDecrementThenLoad(ordering: .relaxed)
                     work()
                     iterations = 0
                 }
-                if workLeft > 0 {
-                    while let work = workQueue.dequeue() {
-                        if !stealableWorkQueue.enqueue(work) {
-                            workLeft = workCount.wrappingDecrementThenLoad(ordering: .relaxed)
-                            work()
-                            break
-                        }
+                while let work = workQueue.dequeue() {
+                    if !stealableWorkQueue.enqueue(work) {
+                        work()
+                        break
                     }
                 }
                 iterations += 1
             }
             
             // Steal other workers work
-            for worker in threadPool.workers {
-                while let work = worker.steal() {
-                    work()
-                }
+            for work in stealableWork {
+                work()
             }
             semaphore.wait()
         }
@@ -139,7 +131,6 @@ internal final class Worker {
     @inlinable
     public final func steal() -> Work? {
         if let work = stealableWorkQueue.dequeue() {
-            workCount.wrappingDecrement(ordering: .relaxed)
             return work
         }
         return nil
@@ -160,6 +151,36 @@ internal final class Worker {
         }
         running.destroy()
         workCount.destroy()
+    }
+
+    @usableFromInline
+    internal struct WorkIterator: Sequence, IteratorProtocol {
+        @usableFromInline
+        internal let workers: [Worker]
+        @usableFromInline
+        internal var index = 0
+        
+        @inlinable
+        public init(_ workers: [Worker]) {
+            self.workers = workers
+        }
+        
+        @inlinable
+        public mutating func next() -> Worker.Work? {
+            let startIndex = index
+            repeat {
+                if let work = workers[index].steal() {
+                    return work
+                }
+                index = (index + 1) & workers.count
+            } while index != startIndex
+            return nil
+        }
+        
+        @inlinable
+        public func makeIterator() -> WorkIterator {
+            self
+        }
     }
 }
 #endif

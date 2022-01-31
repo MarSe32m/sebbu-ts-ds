@@ -43,6 +43,10 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         return tailIndex < headIndex ? (size - headIndex + tailIndex) : (tailIndex - headIndex)
     }
     
+    public var wasFull: Bool {
+        size - count == 1
+    }
+    
     public init(size: Int) {
         let size = size.nextPowerOf2()
         self.size = size

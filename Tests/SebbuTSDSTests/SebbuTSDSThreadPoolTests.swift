@@ -10,6 +10,7 @@ import XCTest
 import SebbuTSDS
 import Dispatch
 import Atomics
+import Foundation
 
 final class SebbuTSDSThreadPoolTests: XCTestCase {
     func testThreadPoolEnqueueing() {
@@ -79,7 +80,7 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         while counter.load(ordering: .relaxed) != 0 {}
         let end = DispatchTime.now().uptimeNanoseconds
         threadPool.stop()
-        XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 1.1)
+        XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 2)
     }
 }
 #endif

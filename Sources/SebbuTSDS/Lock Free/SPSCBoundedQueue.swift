@@ -36,6 +36,10 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         return tailIndex < headIndex ? (buffer.count - headIndex + tailIndex) : (tailIndex - headIndex)
     }
     
+    public var wasFull: Bool {
+        size - count == 1
+    }
+    
     public init(size: Int) {
         precondition(size >= 2, "Queue capacity too small")
         self.size = size.nextPowerOf2()
