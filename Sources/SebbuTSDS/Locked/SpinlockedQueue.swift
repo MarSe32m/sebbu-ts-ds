@@ -92,6 +92,7 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
     }
     
     @inline(__always)
+    @usableFromInline
     internal func _dequeue() -> Element? {
         if headIndex == tailIndex { return nil }
         defer {
@@ -132,15 +133,46 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
         }
     }
     
-    /// Empties the queue and resizes the queue to a new size
-    @inlinable
-    public func resize(to newSize: Int) {
+    /// Removes all the elements specified by the given predicate and returns the removed elements.
+    /// This will aquire the lock for the whole duration of the removal.
+    public func removeAll(where shouldBeRemoved: (Element) throws -> Bool) rethrows -> [Element] {
         lock.lock(); defer { lock.unlock() }
+        let elementCount = _count
+        if elementCount == 0 { return [] }
+        var result = [Element]()
+        result.reserveCapacity(elementCount / 4 > 1 ? elementCount / 4 : 2)
+        for _ in 0..<elementCount {
+            guard let element = _dequeue() else {
+                fatalError("Failed to dequeue an item from a non empty queue?")
+            }
+            if try !shouldBeRemoved(element) {
+                let enqueued = _enqueue(element)
+                assert(enqueued)
+            } else {
+                result.append(element)
+            }
+        }
+        return result
+    }
+    
+    /// Empties the queue and resizes the queue to a new size.
+    /// Optionally one can pass a closure to inspect / transform the removed nodes, such
+    /// as requeue them.
+    @inlinable
+    public func resize(to newSize: Int, _ block: ((Element) -> Void)? = nil) {
+        lock.lock();
         let size = newSize.nextPowerOf2()
+        var removedElements = [Element]()
+        removedElements.reserveCapacity(_count)
+        while let element = _dequeue() { removedElements.append(element)}
         buffer.baseAddress?.deinitialize(count: buffer.count)
         buffer.deallocate()
         buffer = UnsafeMutableBufferPointer.allocate(capacity: size)
         buffer.initialize(repeating: nil)
+        lock.unlock()
+        if let block = block {
+            removedElements.forEach { block($0) }
+        }
     }
     
     /// Doubles the queue size
