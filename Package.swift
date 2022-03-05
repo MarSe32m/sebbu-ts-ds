@@ -19,6 +19,7 @@ let package = Package(
             name: "SebbuTSDS",
             dependencies: [.product(name: "Atomics", package: "swift-atomics", condition: .when(platforms: [.iOS, .macOS, .tvOS, .watchOS, .linux])),
                            .product(name: "DequeModule", package: "swift-collections"),
+                           .product(name: "PriorityQueueModule", package: "swift-collections"),
                            "CSebbuTSDS"]),
         .target(name: "CSebbuTSDS"),
         .testTarget(

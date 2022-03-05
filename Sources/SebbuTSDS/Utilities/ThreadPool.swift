@@ -8,11 +8,12 @@
 //TODO: Create your own threads etc.
 import Foundation
 import Dispatch
+import PriorityQueueModule
 
 #if canImport(Atomics)
 import Atomics
 
-public final class ThreadPool {
+public final class ThreadPool: @unchecked Sendable {
     // There is a big problem in using this setup.
     // There is a possibility that the heaviest computations are
     // enqueued to a specific thread, while the other threads
@@ -24,10 +25,20 @@ public final class ThreadPool {
     @usableFromInline
     internal var workers: [Worker] = []
     
+    @usableFromInline
+    internal let timedWorkQueue: MPSCQueue<TimedWork>
+    
+    @usableFromInline
+    internal var timedWork: Heap<TimedWork> = Heap()
+    
+    @usableFromInline
+    internal let isTimedWorkHandled: UnsafeAtomic<Bool> = .create(false)
+    
     public let numberOfThreads: Int
     
     public init(numberOfThreads: Int, workerThreadCacheSize: Int = 4096) {
         self.numberOfThreads = numberOfThreads
+        self.timedWorkQueue = MPSCQueue(cacheSize: workerThreadCacheSize)
         for _ in 0..<numberOfThreads {
             workers.append(Worker(queueCacheSize: workerThreadCacheSize))
         }
@@ -44,12 +55,40 @@ public final class ThreadPool {
     
     @inlinable
     public final func run(_ block: @escaping () -> ()) {
-        var index = workerIndex.loadThenWrappingIncrement(ordering: .relaxed)
-        if _slowPath(index < 0) {
-            workerIndex.store(0, ordering: .relaxed)
-            index = workerIndex.wrappingIncrementThenLoad(ordering: .relaxed)
-        }
+        let index = getNextIndex()
         workers[index % numberOfThreads].submit(block)
+    }
+    
+    @inlinable
+    public final func run(after nanoseconds: UInt64, _ block: @escaping () -> ()) {
+        let deadline = DispatchTime.now().uptimeNanoseconds + nanoseconds
+        timedWorkQueue.enqueue(TimedWork(block, deadline))
+        let index = getNextIndex()
+        workers[index % numberOfThreads].semaphore.signal()
+    }
+    
+    @inlinable
+    @discardableResult
+    internal final func handleTimedWork() -> Int {
+        // Is someone else handling timed out work?
+        if isTimedWorkHandled.exchange(true, ordering: .acquiring) { return 0 }
+        defer { isTimedWorkHandled.store(false, ordering: .releasing) }
+        
+        // Drain the enqueued work
+        for work in timedWorkQueue {
+            timedWork.insert(TimedWork(work.work, work.deadline))
+        }
+        
+        while let workItem = timedWork.max() {
+            let currentTime = DispatchTime.now().uptimeNanoseconds
+            if workItem.deadline > currentTime {
+                return currentTime.distance(to: workItem.deadline)
+            }
+            let workItem = timedWork.removeMax()
+            //TODO: Should be just dispatch this to the workers instead of running it right here?
+            workItem.work()
+        }
+        return 0
     }
     
     @inlinable
@@ -57,24 +96,61 @@ public final class ThreadPool {
         workers.forEach { $0.stop() }
     }
     
+    @inlinable
+    internal final func getNextIndex() -> Int {
+        var index = workerIndex.loadThenWrappingIncrement(ordering: .relaxed)
+        if _slowPath(index < 0) {
+            workerIndex.store(0, ordering: .relaxed)
+            index = workerIndex.wrappingIncrementThenLoad(ordering: .relaxed)
+        }
+        return index
+    }
+    
     deinit {
         stop()
         workerIndex.destroy()
+        isTimedWorkHandled.destroy()
+    }
+}
+
+@usableFromInline
+internal struct Work {
+    @usableFromInline
+    let work: () -> ()
+    
+    @inlinable
+    init(_ work: @escaping () -> ()) {
+        self.work = work
+    }
+}
+
+@usableFromInline
+internal struct TimedWork: Comparable {
+    @usableFromInline
+    let work: () -> ()
+    
+    @usableFromInline
+    let deadline: UInt64
+    
+    @inlinable
+    init(_ work: @escaping () -> (), _ deadline: UInt64) {
+        self.work = work
+        self.deadline = deadline
+    }
+    
+    @usableFromInline
+    static func < (lhs: TimedWork, rhs: TimedWork) -> Bool {
+        lhs.deadline > rhs.deadline
+    }
+
+    @usableFromInline
+    static func == (lhs: TimedWork, rhs: TimedWork) -> Bool {
+        lhs.deadline == rhs.deadline
     }
 }
 
 @usableFromInline
 internal final class Worker {
-    @usableFromInline
-    struct Work {
-        @usableFromInline
-        let work: () -> ()
-        
-        init(_ work: @escaping () -> ()) {
-            self.work = work
-        }
-    }
-    
     // We wrap the work in a struct to avoid allocations on every enqueue.
     // Workaround for: https://bugs.swift.org/browse/SR-15872
     // The ThreadPool tests run much faster (~25 seconds -> ~15.4 seconds)
@@ -117,6 +193,7 @@ internal final class Worker {
         while running.load(ordering: .relaxed) {
             var iterations = 0
             while iterations < maxIterations {
+                threadPool.handleTimedWork()
                 if let work = stealableWorkQueue.dequeue() {
                     work.work()
                     iterations = 0
@@ -138,7 +215,8 @@ internal final class Worker {
             for work in stealableWork {
                 work.work()
             }
-            semaphore.wait()
+            let waitTime = threadPool.handleTimedWork()
+            _ = semaphore.wait(timeout: .now() + .nanoseconds(waitTime))
         }
     }
     
@@ -180,7 +258,7 @@ internal final class Worker {
         }
         
         @inlinable
-        public mutating func next() -> Worker.Work? {
+        public mutating func next() -> Work? {
             let startIndex = index
             repeat {
                 if let work = workers[index].steal() {

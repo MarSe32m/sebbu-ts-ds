@@ -82,5 +82,31 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         threadPool.stop()
         XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 2)
     }
+    
+    func testThreadPoolRunAfter() {
+        let enqueueCount = 1000
+        let threadPool = ThreadPool(numberOfThreads: 5)
+        threadPool.start()
+        let counter = ManagedAtomic<Int>(enqueueCount)
+        let itemsToEnqueue = ManagedAtomic<Int>(enqueueCount)
+        
+        func enqueue() {
+            threadPool.run(after: 10_000_000) {
+                if itemsToEnqueue.wrappingDecrementThenLoad(ordering: .relaxed) < 0 { return }
+                counter.wrappingDecrement(ordering: .relaxed)
+                enqueue()
+            }
+        }
+        
+        for _ in 0..<5 {
+            enqueue()
+        }
+        
+        let start = DispatchTime.now().uptimeNanoseconds
+        while counter.load(ordering: .relaxed) != 0 {}
+        let end = DispatchTime.now().uptimeNanoseconds
+        threadPool.stop()
+        XCTAssertGreaterThanOrEqual(Double(end - start) / 1_000_000_000.0, 1)
+    }
 }
 #endif
