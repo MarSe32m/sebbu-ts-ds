@@ -5,6 +5,7 @@
 //  Created by Sebastian Toivonen on 6.12.2020.
 //
 
+//TODO: Add the Foundation specific utilities to a different package so that the SebbuTSDS has no Foundation dependency
 import Foundation
 
 extension FixedWidthInteger {

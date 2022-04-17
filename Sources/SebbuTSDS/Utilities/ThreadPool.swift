@@ -74,7 +74,7 @@ public final class ThreadPool: @unchecked Sendable {
         if isTimedWorkHandled.exchange(true, ordering: .acquiring) { return 0 }
         defer { isTimedWorkHandled.store(false, ordering: .releasing) }
         
-        // Drain the enqueued work
+        // Move the enqueued work into the priority queue
         for work in timedWorkQueue {
             timedWork.insert(TimedWork(work.work, work.deadline))
         }
@@ -85,8 +85,8 @@ public final class ThreadPool: @unchecked Sendable {
                 return currentTime.distance(to: workItem.deadline)
             }
             let workItem = timedWork.removeMax()
-            //TODO: Should be just dispatch this to the workers instead of running it right here?
-            workItem.work()
+            // Enqueue the work to a worker thread
+            run(workItem.work)
         }
         return 0
     }
@@ -163,8 +163,6 @@ internal final class Worker {
     public let semaphore: DispatchSemaphore = .init(value: 0)
     public let running: UnsafeAtomic<Bool> = .create(false)
     
-    public let workCount: UnsafeAtomic<Int> = .create(0)
-    
     init(queueCacheSize: Int) {
         workQueue = MPSCQueue(cacheSize: queueCacheSize)
         stealableWorkQueue = MPMCBoundedQueue(size: queueCacheSize)
@@ -188,7 +186,7 @@ internal final class Worker {
     public final func run(threadPool: ThreadPool) {
         // If the value was already true, then don't run again...
         if running.exchange(true, ordering: .relaxed) { return }
-        let maxIterations = 1024
+        let maxIterations = 32 // Maybe this should be configurable?
         let stealableWork = WorkIterator(threadPool.workers)
         while running.load(ordering: .relaxed) {
             var iterations = 0
@@ -215,8 +213,13 @@ internal final class Worker {
             for work in stealableWork {
                 work.work()
             }
+            
             let waitTime = threadPool.handleTimedWork()
-            _ = semaphore.wait(timeout: .now() + .nanoseconds(waitTime))
+            if waitTime > 0 {
+                _ = semaphore.wait(timeout: .now() + .nanoseconds(waitTime))
+            } else {
+                semaphore.wait()
+            }
         }
     }
     
@@ -242,7 +245,6 @@ internal final class Worker {
             work.work()
         }
         running.destroy()
-        workCount.destroy()
     }
 
     @usableFromInline
