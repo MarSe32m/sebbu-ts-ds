@@ -79,7 +79,9 @@ public final class ThreadPool: @unchecked Sendable {
             timedWork.insert(TimedWork(work.work, work.deadline))
         }
         
+        // Process the priority queue
         while let workItem = timedWork.max() {
+            //TODO: Hoist this outside the loop?
             let currentTime = DispatchTime.now().uptimeNanoseconds
             if workItem.deadline > currentTime {
                 return currentTime.distance(to: workItem.deadline)
@@ -194,11 +196,9 @@ internal final class Worker {
                 threadPool.handleTimedWork()
                 if let work = stealableWorkQueue.dequeue() {
                     work.work()
-                    iterations = 0
                 }
                 if let work = workQueue.dequeue() {
                     work.work()
-                    iterations = 0
                 }
                 while let work = workQueue.dequeue() {
                     if !stealableWorkQueue.enqueue(work) {
@@ -225,10 +225,7 @@ internal final class Worker {
     
     @inlinable
     public final func steal() -> Work? {
-        if let work = stealableWorkQueue.dequeue() {
-            return work
-        }
-        return nil
+        stealableWorkQueue.dequeue()
     }
     
     @inlinable
@@ -266,7 +263,7 @@ internal final class Worker {
                 if let work = workers[index].steal() {
                     return work
                 }
-                index = (index + 1) & workers.count
+                index = (index + 1) % workers.count
             } while index != startIndex
             return nil
         }
