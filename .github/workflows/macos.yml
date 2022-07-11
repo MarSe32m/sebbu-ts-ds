@@ -1,0 +1,32 @@
+name: macOS
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  macOS-swift-latest:
+    runs-on: macos-latest
+    
+    name: macOS Swift Latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      
+    - name: Swift Version
+      run: swift --version
+          
+    - name: Build (Debug)
+      run: swift build -c debug
+          
+    - name: Build (Release)
+      run: swift build -c release
+      
+    - name: Test (Debug)
+      run: swift test --configuration debug --enable-test-discovery --parallel
+      
+    - name: Test (Release)
+      run: swift test --configuration release -Xswiftc -enable-testing --parallel
