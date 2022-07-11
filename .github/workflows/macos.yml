@@ -26,7 +26,7 @@ jobs:
       run: swift build -c release
       
     - name: Test (Debug)
-      run: swift test --configuration debug --enable-test-discovery --parallel
+      run: swift test --configuration debug --parallel
       
     - name: Test (Release)
       run: swift test --configuration release -Xswiftc -enable-testing --parallel
