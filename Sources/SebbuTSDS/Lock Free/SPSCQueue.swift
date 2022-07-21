@@ -68,6 +68,7 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
             return nil
         }
         let result = head.pointee.next?.pointee.data
+        head.pointee.next?.pointee.data = nil
         atomicMemoryFence(ordering: .acquiringAndReleasing)
         let front = head
         head = front.pointee.next!

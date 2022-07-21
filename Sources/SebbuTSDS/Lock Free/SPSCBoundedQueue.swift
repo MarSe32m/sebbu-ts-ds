@@ -82,6 +82,7 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
             }
         }
         let value = buffer[pos & mask]
+        buffer[pos & mask] = nil
         head.store(pos + 1, ordering: .releasing)
         return value
     }

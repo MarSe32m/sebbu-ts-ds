@@ -71,6 +71,7 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
             return nil
         }
         let result = next.pointee.data
+        next.pointee.data = nil
         head.store(next, ordering: .releasing)
         if !cache.enqueue(currentHead) {
             currentHead.pointee.next.destroy()

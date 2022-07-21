@@ -110,6 +110,7 @@ public final class SPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
             }
         }
         defer {
+            node.pointee.data.pointee = nil
             node.pointee.sequence.store(pos + mask + 1, ordering: .releasing)
         }
         return node.pointee.data.pointee

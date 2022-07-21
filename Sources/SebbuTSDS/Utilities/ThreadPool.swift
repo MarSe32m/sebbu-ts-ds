@@ -18,7 +18,12 @@ public final class ThreadPool: @unchecked Sendable {
     // There is a possibility that the heaviest computations are
     // enqueued to a specific thread, while the other threads
     // run short computations and when done, have to wait for
-    // more work...
+    // more work... This is worked around by having the workers
+    // have two queues, a bounded stealable MPMC queue and an
+    // unbounded MPSC queue. The stealable queue is always filled first
+    // and when a worker runs out of work, they will drain the other workers
+    // stealable work queues. This way the probability of a worker being idle
+    // while having potential work is decreased but not totally removed.
     @usableFromInline
     internal let workerIndex = UnsafeAtomic<Int>.create(0)
     
@@ -191,8 +196,7 @@ internal final class Worker {
         let maxIterations = 32 // Maybe this should be configurable?
         let stealableWork = WorkIterator(threadPool.workers)
         while running.load(ordering: .relaxed) {
-            var iterations = 0
-            while iterations < maxIterations {
+            for _ in 0..<maxIterations {
                 threadPool.handleTimedWork()
                 if let work = stealableWorkQueue.dequeue() {
                     work.work()
@@ -206,7 +210,6 @@ internal final class Worker {
                         break
                     }
                 }
-                iterations += 1
             }
             
             // Steal other workers work
