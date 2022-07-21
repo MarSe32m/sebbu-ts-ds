@@ -1,0 +1,42 @@
+name: Windows
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+         - tag: 5.6.2-RELEASE
+           branch: swift-5.6.2-release
+         - tag: DEVELOPMENT-SNAPSHOT-2022-06-26-a
+           branch: development
+           
+    steps:
+    - uses: compnerd/gha-setup-swift@main
+      with:
+        branch: ${{ matrix.branch }}
+        tag: ${{ matrix.tag }}
+    - uses: actions/checkout@v2
+    
+    - name: Swift Version
+      run: swift --version
+      
+    - name: Build (Debug)
+      run: swift build -c debug
+      
+    - name: Build (Release)
+      run: swift build -c release
+      
+    - name: Test (Debug)
+      run: swift test --configuration debug --parallel
+      
+    - name: Test (Release)
+      run: swift test --configuration release -Xswiftc -enable-testing --parallel
