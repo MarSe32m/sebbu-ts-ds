@@ -74,7 +74,7 @@ public final class Lock: @unchecked Sendable {
     @inlinable
     public final func tryLock() -> Bool {
 #if os(Windows)
-        TryAcquireSRWLockExclusive(self.mutex)
+        TryAcquireSRWLockExclusive(self.mutex) != 0
 #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
         os_unfair_lock_trylock(self.mutex)
 #else
