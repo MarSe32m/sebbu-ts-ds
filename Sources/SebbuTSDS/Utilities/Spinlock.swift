@@ -5,7 +5,8 @@
 //  Created by Sebastian Toivonen on 28.12.2021.
 //
 
-#if canImport(Atomics)
+// Spinlocking is extremely bad on iOS, tvOS and watchOS, so for them we will use the os_unfair_lock
+#if canImport(Atomics) && !(os(iOS) || os(tvOS) || os(watchOS))
 import Atomics
 import CSebbuTSDS
 
@@ -46,8 +47,15 @@ public final class Spinlock: @unchecked Sendable {
         return try block()
     }
     
+    @inline(__always)
+    public final func withLockVoid(_ body: () throws -> Void) rethrows -> Void {
+        try withLock(body)
+    }
+    
     deinit {
         _lock.destroy()
     }
 }
+#else
+public typealias Spinlock = Lock
 #endif

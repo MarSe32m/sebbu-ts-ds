@@ -9,6 +9,9 @@
 public protocol ConcurrentStack {
     associatedtype Element
     
+    @inlinable
+    var count: Int { get }
+    
     /// Pushes an item on top of the stack
     /// - returns Boolean value based on if the item was pushed successfully
     @inlinable
@@ -24,6 +27,9 @@ public protocol ConcurrentStack {
 }
 
 public extension ConcurrentStack {
+    //TODO: Maybe remove default implementation
+    var count: Int { -1 }
+    
     @inlinable
     func blockingPush(_ value: Element) {
         while !push(value) {}

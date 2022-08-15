@@ -4,7 +4,6 @@
 //
 //  Created by Sebastian Toivonen on 29.12.2021.
 //
-#if canImport(Atomics)
 import DequeModule
 
 public final class SpinlockedDeque<Element>: ConcurrentDeque, @unchecked Sendable {
@@ -126,5 +125,3 @@ public final class SpinlockedDeque<Element>: ConcurrentDeque, @unchecked Sendabl
         }
     }
 }
-
-#endif

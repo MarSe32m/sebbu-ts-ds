@@ -31,6 +31,14 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
     internal let cache: SPSCBoundedQueue<UnsafeMutablePointer<Node>>
     
+    @inlinable
+    public var wasFull: Bool { false }
+    
+    @inlinable
+    public var first: Element? {
+        head.pointee.next?.pointee.data
+    }
+    
     public init(cacheSize: Int = 128) {
         let node = UnsafeMutablePointer<Node>.allocate(capacity: 1)
         node.initialize(to: Node(data: nil))
@@ -119,4 +127,6 @@ extension SPSCQueue: Sequence {
         Iterator(queue: self)
     }
 }
+#else
+public typealias SPSCQueue<Element> = LockedQueue<Element>
 #endif

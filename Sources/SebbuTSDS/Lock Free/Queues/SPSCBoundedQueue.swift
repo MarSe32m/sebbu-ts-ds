@@ -36,8 +36,21 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
         return tailIndex < headIndex ? (buffer.count - headIndex + tailIndex) : (tailIndex - headIndex)
     }
     
+    @inlinable
     public var wasFull: Bool {
         size - count == 1
+    }
+    
+    @inlinable
+    public var first: Element? {
+        let pos = head.load(ordering: .relaxed)
+        if (tailCached - pos) & mask < 1 {
+            tailCached = tail.load(ordering: .acquiring)
+            if (tailCached - pos) & mask < 1 {
+                return nil
+            }
+        }
+        return buffer[pos & mask]
     }
     
     public init(size: Int) {
@@ -116,4 +129,6 @@ extension SPSCBoundedQueue: Sequence {
         Iterator(queue: self)
     }
 }
+#else
+public typealias SPSCBoundedQueue<Element> = LockedQueue<Element>
 #endif

@@ -1,15 +1,14 @@
 //
-//  SpinlockedQueue.swift
+//  LockedQueue.swift
 //  
 //
-//  Created by Sebastian Toivonen on 28.12.2021.
+//  Created by Sebastian Toivonen on 6.12.2020.
 //
-#if canImport(Atomics)
+
 //TODO: Implement shrinking when automaticResizing is enabled?
-/// Differs from the LockedQueue by just the lock. Instead of a standard lock, this one uses a spinlock.
-public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
+public final class LockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
-    internal let lock = Spinlock()
+    internal let lock = Lock()
     
     @usableFromInline
     internal var buffer: UnsafeMutableBufferPointer<Element?>
@@ -26,11 +25,12 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
     @inline(__always)
     public var resizeAutomatically: Bool {
         get {
-            lock.withLock {
-                _resizeAutomatically
-            }
+            lock.lock()
+            let returnValue = _resizeAutomatically
+            lock.unlock()
+            return returnValue
         }
-        set {
+        set (newValue) {
             lock.lock()
             _resizeAutomatically = newValue
             lock.unlock()
@@ -50,6 +50,13 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
     public var count: Int {
         lock.withLock {
             _count
+        }
+    }
+    
+    @inlinable
+    public var wasFull: Bool {
+        lock.withLock {
+            !_resizeAutomatically && ((tailIndex + 1) & self.mask == headIndex)
         }
     }
     
@@ -193,11 +200,27 @@ public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendabl
         newBuffer.baseAddress?.deinitialize(count: newBuffer.count)
         newBuffer.deallocate()
     }
+    
+    /// Doubles the queue size
+    /*@inlinable
+    internal func _grow() {
+        let nextSize = max(backingArray.count, (backingArray.count + 1).nextPowerOf2())
+        let copy = backingArray
+        let oldMask = self.mask
+        backingArray = Array<Element?>(repeating: nil, count: nextSize)
+        for index in 0..<copy.count {
+            backingArray[index] = copy[(index + headIndex) & oldMask]
+        }
+        
+        tailIndex = copy.count - 1
+        headIndex = 0
+    }
+     */
 }
 
-extension SpinlockedQueue: Sequence {
+extension LockedQueue: Sequence {
     public struct Iterator: IteratorProtocol {
-        internal let queue: SpinlockedQueue
+        internal let queue: LockedQueue
         
         public func next() -> Element? {
             queue.dequeue()
@@ -208,4 +231,3 @@ extension SpinlockedQueue: Sequence {
         Iterator(queue: self)
     }
 }
-#endif

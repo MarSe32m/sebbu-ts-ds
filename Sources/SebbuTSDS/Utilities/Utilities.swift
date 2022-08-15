@@ -7,6 +7,7 @@
 
 //TODO: Add the Foundation specific utilities to a different package so that the SebbuTSDS has no Foundation dependency
 import Foundation
+import CSebbuTSDS
 
 extension FixedWidthInteger {
     /// Returns the next power of two.
@@ -33,3 +34,12 @@ public extension NSLock {
 }
 
 extension NSLock: @unchecked Sendable {}
+
+public enum HardwareUtilities {
+    /// Issues a hardware pause
+    /// On x86/x64 this is the PAUSE instruction, on ARM this is yield, othewise its a no-op
+    @inline(__always)
+    public static func pause() {
+        CSebbuTSDS._pause()
+    }
+}

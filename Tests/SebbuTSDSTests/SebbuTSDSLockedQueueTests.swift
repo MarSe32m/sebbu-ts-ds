@@ -1,8 +1,6 @@
 import XCTest
 import SebbuTSDS
-#if canImport(Atomics)
-import Atomics
-#endif
+
 final class SebbuTSDSLockedQueueTests: XCTestCase {
     func testLockedQueue() {
         let lockedQueue = LockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: false)
@@ -65,7 +63,6 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
     }
     
     func testSpinlockedQueue() {
-#if canImport(Atomics)
         let spinlockedQueue = SpinlockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: false)
         let spinlockedQueueAutomaticResize = SpinlockedQueue<(item: Int, thread: Int)>(size: 16, resizeAutomatically: true)
         
@@ -80,18 +77,14 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
         
         let queueOfReferenceTypes = SpinlockedQueue<Object>(size: 50000)
         test(queue: queueOfReferenceTypes, singleWriter: false, singleReader: false)
-#endif
     }
     
     func testSpinlockedQueueSequenceConformance() {
-#if canImport(Atomics)
         let queue = SpinlockedQueue<Int>(size: 1_000)
         testQueueSequenceConformance(queue)
-#endif
     }
     
     func testSpinlockedQueueCount() {
-#if canImport(Atomics)
         func remove(_ queue: SpinlockedQueue<Int>) -> Int {
             return queue.dequeue() != nil ? -1 : 0
         }
@@ -125,14 +118,11 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
             elements += Bool.random() ? add(queue) : remove(queue)
             XCTAssertEqual(queue.count, elements)
         }
-#endif
     }
     
     func testQueueDraining() {
-#if canImport(Atomics)
-        testDraining(SpinlockedQueue<Int>(size: 16, resizeAutomatically: false))
-        testDraining(SpinlockedQueue<Int>(size: 16, resizeAutomatically: true))
-#endif
+        testDraining(SpinlockedQueue<Int>(size: 10000, resizeAutomatically: false))
+        testDraining(SpinlockedQueue<Int>(size: 10000, resizeAutomatically: true))
         
         testDraining(LockedQueue<Int>(size: 10000, resizeAutomatically: false))
         testDraining(LockedQueue<Int>(size: 10000, resizeAutomatically: true))

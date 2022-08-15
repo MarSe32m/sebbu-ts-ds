@@ -28,7 +28,6 @@ final class SebbuTSDSLockedBenchmarks: XCTestCase {
         }
     }
     
-    #if canImport(Atomics)
     func testSpinlockedQueueEnqueueDequeueBenchmark() {
         guard !isDebug() else { return }
         let queue = SpinlockedQueue<Int>(size: 1000)
@@ -47,7 +46,6 @@ final class SebbuTSDSLockedBenchmarks: XCTestCase {
             }
         }
     }
-    #endif
     
     func testLockedDequeEnqueueDequeueBenchmark() {
         guard !isDebug() else { return }
@@ -68,7 +66,6 @@ final class SebbuTSDSLockedBenchmarks: XCTestCase {
         }
     }
     
-    #if canImport(Atomics)
     func testSpinlockedDequeEnqueueDequeueBenchmark() {
         guard !isDebug() else { return }
         let queue = SpinlockedDeque<Int>()
@@ -87,5 +84,4 @@ final class SebbuTSDSLockedBenchmarks: XCTestCase {
             }
         }
     }
-    #endif
 }

@@ -5,12 +5,14 @@
 //  Created by Sebastian Toivonen on 28.12.2021.
 //
 #if canImport(Atomics)
+import Atomics
+#endif
 import XCTest
 import SebbuTSDS
-import Atomics
 import Foundation
 
 final class SebbuTSDSLockTests: XCTestCase {
+    #if canImport(Atomics)
     func testSpinlockCounting() {
         let spinlock = Spinlock()
         var counter = 1_000_000 * 11
@@ -70,5 +72,44 @@ final class SebbuTSDSLockTests: XCTestCase {
             XCTAssert(counter == 0)
         }
     }
+    #endif
+    
+    func testTryLocking() {
+        let spinlock = Spinlock()
+        let lock = Lock()
+        let nsLock = NSLock()
+        
+        XCTAssertTrue(spinlock.tryLock())
+        XCTAssertTrue(lock.tryLock())
+        XCTAssertTrue(nsLock.try())
+        
+        spinlock.unlock()
+        lock.unlock()
+        nsLock.unlock()
+        
+        Thread.detachNewThread {
+            spinlock.lock()
+            lock.lock()
+            nsLock.lock()
+            Thread.sleep(forTimeInterval: 3)
+            spinlock.unlock()
+            lock.unlock()
+            nsLock.unlock()
+        }
+        
+        Thread.sleep(forTimeInterval: 1)
+        XCTAssertFalse(spinlock.tryLock())
+        XCTAssertFalse(lock.tryLock())
+        XCTAssertFalse(nsLock.try())
+        
+        Thread.sleep(forTimeInterval: 5)
+        
+        XCTAssertTrue(spinlock.tryLock())
+        XCTAssertTrue(lock.tryLock())
+        XCTAssertTrue(nsLock.try())
+        
+        spinlock.unlock()
+        lock.unlock()
+        nsLock.unlock()
+    }
 }
-#endif

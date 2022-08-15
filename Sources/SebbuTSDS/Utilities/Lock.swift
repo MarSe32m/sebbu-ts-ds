@@ -70,6 +70,19 @@ public final class Lock: @unchecked Sendable {
         precondition(error == 0, "\(#function) failed to unlock pthread_mutex with error \(error)")
 #endif
     }
+    
+    @inlinable
+    public final func tryLock() -> Bool {
+#if os(Windows)
+        TryAcquireSRWLockExclusive(self.mutex)
+#elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+        os_unfair_lock_trylock(self.mutex)
+#else
+        let error = pthread_mutex_trylock(self.mutex)
+        precondition(error == 0 || error == EBUSY, "\(#function) failed to try_lock pthread_mutex with error \(error)")
+        return error == 0
+#endif
+    }
 }
 
 extension Lock {

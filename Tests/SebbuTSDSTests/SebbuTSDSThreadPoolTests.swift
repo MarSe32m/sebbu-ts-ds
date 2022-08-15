@@ -29,8 +29,8 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
     
     func testThreadPoolEnqueueingFromMultipleThreads() {
         let enqueueCount = 1000000
-        let enqueueingThreadCount = 8
-        let threadPool = ThreadPool(numberOfThreads: 8)
+        let enqueueingThreadCount = 6
+        let threadPool = ThreadPool(numberOfThreads: 6)
         threadPool.start()
         let counter = ManagedAtomic<Int>((0...enqueueCount).reduce(0, +) * enqueueingThreadCount)
         DispatchQueue.concurrentPerform(iterations: enqueueingThreadCount) { thread in
@@ -44,7 +44,7 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         threadPool.stop()
     }
     
-    func testThreadPoolHavingManyThreadsEnqueueing() {
+    func _testThreadPoolHavingManyThreadsEnqueueing() {
         let enqueueCount = 1000000
         let enqueueingThreadCount = 8
         let threadPool = ThreadPool(numberOfThreads: 100)

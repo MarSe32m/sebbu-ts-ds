@@ -9,6 +9,9 @@
 public protocol ConcurrentQueue {
     associatedtype Element
     
+    @inlinable
+    var wasFull: Bool { get }
+    
     /// Enqueues an item to the queue
     /// - returns Boolean value based on if the item was enqueued successfully
     @inlinable

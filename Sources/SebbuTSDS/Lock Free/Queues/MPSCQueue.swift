@@ -32,6 +32,18 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     internal let cache: SPMCBoundedQueue<UnsafeMutablePointer<BufferNode>>
     
     @inlinable
+    public var wasFull: Bool { false }
+    
+    @inlinable
+    public var first: Element? {
+        let currentHead = head.load(ordering: .relaxed)
+        guard let next = currentHead.pointee.next.load(ordering: .acquiring) else {
+            return nil
+        }
+        return next.pointee.data
+    }
+    
+    @inlinable
     public init(cacheSize: Int = 1024) {
         let node = UnsafeMutablePointer<BufferNode>.allocate(capacity: 1)
         node.initialize(to: BufferNode(data: nil))
@@ -121,4 +133,6 @@ extension MPSCQueue: Sequence {
         Iterator(queue: self)
     }
 }
+#else
+public typealias MPSCQueue<Element> = LockedQueue<Element>
 #endif
