@@ -15,7 +15,7 @@
 #define hardware_pause() __asm__("")
 #endif
 
-inline void _pause() {
+void _pause() {
     hardware_pause();
 }
 

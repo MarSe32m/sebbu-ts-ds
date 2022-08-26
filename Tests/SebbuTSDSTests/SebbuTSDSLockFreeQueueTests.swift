@@ -54,7 +54,7 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
     }
     
     func testMPMCBoundedQueue() {
-        for i in 2...ProcessInfo.processInfo.processorCount {
+        for i in 2...ProcessInfo.processInfo.activeProcessorCount {
             test(queue: MPMCBoundedQueue<(item: Int, thread: Int)>(size: 128), writers: i / 2, readers: i / 2, elements: 1_000_00)
             test(queue: MPMCBoundedQueue<(item: Int, thread: Int)>(size: 128), writers: i / 2, readers: i - i / 2, elements: 1_000_00)
             test(queue: MPMCBoundedQueue<(item: Int, thread: Int)>(size: 128), writers: i - i / 2, readers: i / 2, elements: 1_000_00)
@@ -87,7 +87,7 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
     }
     
     func testSPMCBoundedQueue() {
-        for i in 2...ProcessInfo.processInfo.processorCount {
+        for i in 2...ProcessInfo.processInfo.activeProcessorCount {
             test(queue: SPMCBoundedQueue<(item: Int, thread: Int)>(size: 65536), writers: 1, readers: i - 1, elements: 128)
             test(queue: SPMCBoundedQueue<(item: Int, thread: Int)>(size: 65536), writers: 1, readers: i - 1, elements: 10_000)
             test(queue: SPMCBoundedQueue<(item: Int, thread: Int)>(size: 65536), writers: 1, readers: i - 1, elements: 10_000_00)
@@ -110,7 +110,7 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
     }
     
     func testMPSCQueue() {
-        for i in 2...ProcessInfo.processInfo.processorCount {
+        for i in 2...ProcessInfo.processInfo.activeProcessorCount {
             test(queue: MPSCQueue<(item: Int, thread: Int)>(), writers: i - 1, readers: 1, elements: 1_000_00)
             test(queue: MPSCQueue<(item: Int, thread: Int)>(cacheSize: 10000), writers: i - 1, readers: 1, elements: 1_000_00)
             test(queue: MPSCQueue<(item: Int, thread: Int)>(cacheSize: 65536), writers: i - 1, readers: 1, elements: 1_000_00)
@@ -122,7 +122,7 @@ final class SebbuTSDSLockFreeQueueTests: XCTestCase {
     }
     
     func testMPSCBoundedQueue() {
-        for i in 2...ProcessInfo.processInfo.processorCount {
+        for i in 2...ProcessInfo.processInfo.activeProcessorCount {
             test(queue: MPSCBoundedQueue<(item: Int, thread: Int)>(size: 10000), writers: i - 1, readers: 1, elements: 1_000_00)
         }
         testQueueSequenceConformance(MPSCBoundedQueue<Int>(size: 10000))
