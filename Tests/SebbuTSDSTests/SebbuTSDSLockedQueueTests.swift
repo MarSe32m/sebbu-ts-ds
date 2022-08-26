@@ -7,7 +7,10 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
         let lockedBounded = LockedBoundedQueue<(item: Int, thread: Int)>(size: 1000)
         
         // Should probably be based on the amount of cores the test machine has available
-        let count = ProcessInfo.processInfo.activeProcessorCount >= 2 ? ProcessInfo.processInfo.activeProcessorCount : 2
+        var count = ProcessInfo.processInfo.activeProcessorCount < 8 ? ProcessInfo.processInfo.activeProcessorCount : 8
+        if count < 2 {
+            count = 2
+        }
         
         for i in 2...count {
             test(queue: lockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_00)
@@ -72,7 +75,10 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
         let spinlockedQueue = SpinlockedQueue<(item: Int, thread: Int)>()
         let spinlockedBoundedQueue = SpinlockedBoundedQueue<(item: Int, thread: Int)>(size: 1000)
         
-        let count = ProcessInfo.processInfo.activeProcessorCount >= 2 ? ProcessInfo.processInfo.activeProcessorCount : 2
+        var count = ProcessInfo.processInfo.activeProcessorCount < 8 ? ProcessInfo.processInfo.activeProcessorCount : 8
+        if count < 2 {
+            count = 2
+        }
         
         for i in 2...count {
             test(queue: spinlockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_00)

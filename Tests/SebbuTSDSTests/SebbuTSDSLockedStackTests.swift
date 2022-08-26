@@ -13,7 +13,7 @@ final class SebbuTSDSLockedStackTests: XCTestCase {
         let lockedBoundedStack = LockedBoundedStack<(item: Int, thread: Int)>(capacity: 128)
         
         // Should probably be based on the amount of cores the test machine has available
-        let count = ProcessInfo.processInfo.activeProcessorCount >= 2 ? ProcessInfo.processInfo.activeProcessorCount : 2
+        let count = ProcessInfo.processInfo.activeProcessorCount < 8 ? ProcessInfo.processInfo.activeProcessorCount : 8
         
         for i in 2...count {
             test(stack: lockedStack, writers: i / 2, readers: i / 2, elements: 1_000_00)
