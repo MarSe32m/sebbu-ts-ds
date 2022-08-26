@@ -18,3 +18,7 @@
 inline void _pause() {
     hardware_pause();
 }
+
+__attribute__((constructor)) void setupSharedThreadPool() {
+    setup_shared_threadpool();
+}

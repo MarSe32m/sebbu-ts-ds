@@ -159,6 +159,6 @@ extension MPSCBoundedQueue: Sequence {
     }
 }
 #else
-public typealias MPSCBoundedQueue<Element> = LockedQueue<Element>
+public typealias MPSCBoundedQueue<Element> = LockedBoundedQueue<Element>
 #endif
 

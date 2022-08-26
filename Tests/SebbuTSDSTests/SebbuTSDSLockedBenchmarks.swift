@@ -11,7 +11,7 @@ import SebbuTSDS
 final class SebbuTSDSLockedBenchmarks: XCTestCase {
     func testLockedQueueEnqueueDequeueBenchmark() {
         guard !isDebug() else { return }
-        let queue = LockedQueue<Int>(size: 1000)
+        let queue = LockedQueue<Int>(cacheSize: 1000)
         for i in 0..<10000 {
             _ = queue.enqueue(i)
         }
@@ -30,7 +30,7 @@ final class SebbuTSDSLockedBenchmarks: XCTestCase {
     
     func testSpinlockedQueueEnqueueDequeueBenchmark() {
         guard !isDebug() else { return }
-        let queue = SpinlockedQueue<Int>(size: 1000)
+        let queue = SpinlockedQueue<Int>(cacheSize: 1000)
         for i in 0..<10000 {
             _ = queue.enqueue(i)
         }

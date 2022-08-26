@@ -6,3 +6,5 @@
 //
 
 void _pause();
+
+extern void setup_shared_threadpool();

@@ -3,38 +3,44 @@ import SebbuTSDS
 
 final class SebbuTSDSLockedQueueTests: XCTestCase {
     func testLockedQueue() {
-        let lockedQueue = LockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: false)
-        let lockedQueueAutomaticResize = LockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: true)
+        let lockedQueue = LockedQueue<(item: Int, thread: Int)>()
+        let lockedBounded = LockedBoundedQueue<(item: Int, thread: Int)>(size: 1000)
         
         // Should probably be based on the amount of cores the test machine has available
         let count = ProcessInfo.processInfo.processorCount >= 2 ? ProcessInfo.processInfo.processorCount : 2
         
         for i in 2...count {
             test(queue: lockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_00)
-            test(queue: lockedQueueAutomaticResize, writers: i / 2, readers: i / 2, elements: 1_000_00)
+            test(queue: lockedBounded, writers: i / 2, readers: i / 2, elements: 1_000_00)
             test(queue: lockedQueue, writers: i - 1, readers: 1, elements: 1_000_00)
-            test(queue: lockedQueueAutomaticResize, writers: i - 1, readers: 1, elements: 1_000_00)
+            test(queue: lockedBounded, writers: i - 1, readers: 1, elements: 1_000_00)
         }
         
-        let queueOfReferenceTypes = LockedQueue<Object>(size: 50000)
+        let queueOfReferenceTypes = LockedQueue<Object>()
         test(queue: queueOfReferenceTypes, singleWriter: false, singleReader: false)
+        
+        let anotherQueueOfReferenceTypes = LockedBoundedQueue<Object>(size: 50000)
+        test(queue: anotherQueueOfReferenceTypes, singleWriter: false, singleReader: false)
     }
     
     func testLockedQueueSequenceConformance() {
-        let queue = LockedQueue<Int>(size: 1_000)
+        let queue = LockedQueue<Int>()
         testQueueSequenceConformance(queue)
+        
+        let boundedQueue = LockedBoundedQueue<Int>(size: 10000)
+        testQueueSequenceConformance(boundedQueue)
     }
     
     func testLockedQueueCount() {
-        func remove(_ queue: LockedQueue<Int>) -> Int {
+        func remove<T: ConcurrentQueue>(_ queue: T) -> Int where T.Element == Int {
             return queue.dequeue() != nil ? -1 : 0
         }
         
-        func add(_ queue: LockedQueue<Int>) -> Int {
+        func add<T: ConcurrentQueue>(_ queue: T) -> Int where T.Element == Int {
             return queue.enqueue(Int.random(in: .min ... .max)) ? 1 : 0
         }
         
-        var queue = LockedQueue<Int>(size: 2, resizeAutomatically: true)
+        let queue = LockedQueue<Int>()
         for i in 1...1_000_000 {
             queue.enqueue(i)
             XCTAssert(queue.count == i)
@@ -45,55 +51,58 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
         }
         XCTAssertEqual(queue.count, elements)
         
-        queue = LockedQueue<Int>(size: 32)
+        let _queue = LockedBoundedQueue<Int>(size: 32)
         elements = 0
         for i in 1...24 {
             elements += 1
-            if !queue.enqueue(i) {
+            if !_queue.enqueue(i) {
                 print("WTF")
             }
-            let count = queue.count
+            let count = _queue.count
             XCTAssertEqual(elements, count)
         }
         
-        for _ in 0..<10000000 {
-            elements += Bool.random() ? add(queue) : remove(queue)
-            XCTAssertEqual(queue.count, elements)
+        for _ in 0..<10_000_000 {
+            elements += Bool.random() ? add(_queue) : remove(_queue)
+            XCTAssertEqual(_queue.count, elements)
         }
     }
     
     func testSpinlockedQueue() {
-        let spinlockedQueue = SpinlockedQueue<(item: Int, thread: Int)>(size: 1000, resizeAutomatically: false)
-        let spinlockedQueueAutomaticResize = SpinlockedQueue<(item: Int, thread: Int)>(size: 16, resizeAutomatically: true)
+        let spinlockedQueue = SpinlockedQueue<(item: Int, thread: Int)>()
+        let spinlockedBoundedQueue = SpinlockedBoundedQueue<(item: Int, thread: Int)>(size: 1000)
         
         let count = ProcessInfo.processInfo.processorCount >= 2 ? ProcessInfo.processInfo.processorCount : 2
         
         for i in 2...count {
             test(queue: spinlockedQueue, writers: i / 2, readers: i / 2, elements: 1_000_00)
-            test(queue: spinlockedQueueAutomaticResize, writers: i / 2, readers: i / 2, elements: 1_000_00)
+            test(queue: spinlockedBoundedQueue, writers: i / 2, readers: i / 2, elements: 1_000_00)
             test(queue: spinlockedQueue, writers: i - 1, readers: 1, elements: 1_000_00)
-            test(queue: spinlockedQueueAutomaticResize, writers: i - 1, readers: 1, elements: 1_000_00)
+            test(queue: spinlockedBoundedQueue, writers: i - 1, readers: 1, elements: 1_000_00)
         }
         
-        let queueOfReferenceTypes = SpinlockedQueue<Object>(size: 50000)
+        let queueOfReferenceTypes = SpinlockedQueue<Object>()
         test(queue: queueOfReferenceTypes, singleWriter: false, singleReader: false)
     }
     
     func testSpinlockedQueueSequenceConformance() {
-        let queue = SpinlockedQueue<Int>(size: 1_000)
+        let boundedQueue = SpinlockedBoundedQueue<Int>(size: 1_000)
+        testQueueSequenceConformance(boundedQueue)
+        
+        let queue = SpinlockedQueue<Int>()
         testQueueSequenceConformance(queue)
     }
     
     func testSpinlockedQueueCount() {
-        func remove(_ queue: SpinlockedQueue<Int>) -> Int {
+        func remove<T: ConcurrentQueue>(_ queue: T) -> Int where T.Element == Int{
             return queue.dequeue() != nil ? -1 : 0
         }
         
-        func add(_ queue: SpinlockedQueue<Int>) -> Int {
+        func add<T: ConcurrentQueue>(_ queue: T) -> Int where T.Element == Int {
             return queue.enqueue(Int.random(in: .min ... .max)) ? 1 : 0
         }
         
-        var queue = SpinlockedQueue<Int>(size: 2, resizeAutomatically: true)
+        let queue = SpinlockedQueue<Int>()
         for i in 1...1_000_000 {
             queue.enqueue(i)
             XCTAssert(queue.count == i)
@@ -103,28 +112,29 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
             elements += remove(queue)
         }
         XCTAssertEqual(queue.count, elements)
-        queue = SpinlockedQueue<Int>(size: 32)
+        
+        let _queue = SpinlockedBoundedQueue<Int>(size: 32)
         elements = 0
         for i in 1...24 {
             elements += 1
-            if !queue.enqueue(i) {
+            if !_queue.enqueue(i) {
                 print("WTF")
             }
-            let count = queue.count
+            let count = _queue.count
             XCTAssertEqual(elements, count)
         }
         
-        for _ in 0..<10000000 {
-            elements += Bool.random() ? add(queue) : remove(queue)
-            XCTAssertEqual(queue.count, elements)
+        for _ in 0..<10_000_000 {
+            elements += Bool.random() ? add(_queue) : remove(_queue)
+            XCTAssertEqual(_queue.count, elements)
         }
     }
     
     func testQueueDraining() {
-        testDraining(SpinlockedQueue<Int>(size: 10000, resizeAutomatically: false))
-        testDraining(SpinlockedQueue<Int>(size: 10000, resizeAutomatically: true))
+        testDraining(SpinlockedBoundedQueue<Int>(size: 10000))
+        testDraining(SpinlockedQueue<Int>())
         
-        testDraining(LockedQueue<Int>(size: 10000, resizeAutomatically: false))
-        testDraining(LockedQueue<Int>(size: 10000, resizeAutomatically: true))
+        testDraining(LockedBoundedQueue<Int>(size: 10000))
+        testDraining(LockedQueue<Int>())
     }
 }

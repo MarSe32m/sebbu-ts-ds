@@ -146,5 +146,5 @@ extension SPMCBoundedQueue: Sequence {
     }
 }
 #else
-public typealias SPMCBoundedQueue<Element> = LockedQueue<Element>
+public typealias SPMCBoundedQueue<Element> = LockedBoundedQueue<Element>
 #endif
