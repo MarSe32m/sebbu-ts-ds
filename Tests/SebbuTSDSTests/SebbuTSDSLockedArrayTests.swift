@@ -2,6 +2,7 @@ import XCTest
 import SebbuTSDS
 import Dispatch
 import Foundation
+
 final class SebbuTSDSLockedArrayTests: XCTestCase {
     func testBasics() {
         let lockedArray = LockedArray<Int>()

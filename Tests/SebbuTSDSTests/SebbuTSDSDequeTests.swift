@@ -9,9 +9,7 @@ import XCTest
 import SebbuTSDS
 import Dispatch
 import Foundation
-#if canImport(Atomics)
-import Atomics
-#endif
+
 final class SebbuTSDSDequeTests: XCTestCase {
     func testLockedDeque() {
         let lockedDeque = LockedDeque<(item: Int, thread: Int)>()
@@ -30,7 +28,6 @@ final class SebbuTSDSDequeTests: XCTestCase {
     }
     
     func testSpinlockedDeque() {
-#if canImport(Atomics)
         let spinlockedDeque = SpinlockedDeque<(item: Int, thread: Int)>()
         
         spinlockedDeque.append((item: 1, thread: 0))
@@ -45,13 +42,10 @@ final class SebbuTSDSDequeTests: XCTestCase {
             test(queue: spinlockedDeque, writers: i / 2, readers: i / 2, elements: 1_000_00)
             test(queue: spinlockedDeque, writers: i - 1, readers: 1, elements: 1_000_00)
         }
-#endif
     }
     
     func testDequeDraining() {
-#if canImport(Atomics)
         testDraining(SpinlockedDeque<Int>())
-#endif
         testDraining(LockedDeque<Int>())
     }
 }
