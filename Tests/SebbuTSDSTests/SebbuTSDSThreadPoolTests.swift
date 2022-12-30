@@ -14,13 +14,17 @@ import Foundation
 
 final class SebbuTSDSThreadPoolTests: XCTestCase {
     func testThreadPoolEnqueueing() {
-        let enqueueCount = 10000000
+        let enqueueCount = 10_000_000
         let threadPool = ThreadPool(numberOfThreads: 8)
+        //let threadPool = BoundedThreadPool(size: 100_000, numberOfThreads: 8)
         threadPool.start()
         let counter = ManagedAtomic<Int>((0..<enqueueCount).reduce(0, +))
         for i in 0..<enqueueCount {
             threadPool.run {
                 counter.wrappingDecrement(by: i, ordering: .relaxed)
+            }
+            while (false) {
+                print("Full!!")
             }
         }
         while counter.load(ordering: .relaxed) != 0 { Thread.sleep(forTimeInterval: 0.01) }

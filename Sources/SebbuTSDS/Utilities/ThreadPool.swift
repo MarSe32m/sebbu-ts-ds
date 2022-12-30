@@ -8,7 +8,7 @@
 //TODO: Create your own threads etc.
 import Foundation
 import Dispatch
-import PriorityQueueModule
+import HeapModule
 import CSebbuTSDS
 
 #if canImport(Atomics)
@@ -46,7 +46,7 @@ final class Queue {
     }
     
     @inlinable
-    @inline(__always)
+    //@inline(__always)
     func enqueue(_ work: Work) {
         workQueue.enqueue(work)
     }
@@ -116,7 +116,9 @@ public final class ThreadPool {
         assert(!workers.isEmpty)
         let work = Work(operation)
         let index = getNextIndex()
-        queues[index % numberOfThreads].enqueue(work)
+        let queue = queues[index % numberOfThreads]
+        queue.workQueue.enqueue(work)
+        //queue.enqueue(work)
         workCount.wrappingIncrement(ordering: .acquiringAndReleasing)
         semaphore.signal()
     }

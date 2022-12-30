@@ -44,7 +44,7 @@ public final class SPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
         node.initialize(to: Node(data: nil))
         head = node
         tail = node
-        cache = SPSCBoundedQueue(size: cacheSize)
+        cache = SPSCBoundedQueue(size: Swift.max(2, cacheSize))
     }
 
     deinit {
