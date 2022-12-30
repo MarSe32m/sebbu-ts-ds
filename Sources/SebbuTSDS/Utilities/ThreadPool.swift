@@ -28,7 +28,7 @@ final class Queue {
     let processing: ManagedAtomic<Bool>
     
     init(cacheSize: Int = 4096) {
-        self.workQueue = MPSCQueue(cacheSize: 4096)
+        self.workQueue = MPSCQueue(cacheSize: cacheSize)
         self.processing = ManagedAtomic(false)
     }
     
@@ -114,11 +114,10 @@ public final class ThreadPool {
     public func run(operation: @escaping () -> ()) {
         precondition(started.load(ordering: .relaxed), "The ThreadPool wasn't started before blocks were submitted")
         assert(!workers.isEmpty)
-        let work = Work(operation)
         let index = getNextIndex()
         let queue = queues[index % numberOfThreads]
-        queue.workQueue.enqueue(work)
-        //queue.enqueue(work)
+        let work = Work(operation)
+        queue.enqueue(work)
         workCount.wrappingIncrement(ordering: .acquiringAndReleasing)
         semaphore.signal()
     }
@@ -184,9 +183,9 @@ public final class ThreadPool {
 }
 
 @usableFromInline
-internal struct Work {
+internal final class Work {
     @usableFromInline
-    let work: () -> ()
+    var work: () -> ()
     
     @inlinable
     init(_ work: @escaping () -> ()) {
@@ -195,7 +194,7 @@ internal struct Work {
 }
 
 @usableFromInline
-internal struct TimedWork: Comparable {
+internal final class TimedWork: Comparable {
     @usableFromInline
     let work: () -> ()
     
@@ -243,7 +242,8 @@ final class Worker {
             repeat {
                 let queueIndex = threadPool.getQueueIndex()
                 for i in 0..<numberOfQueues {
-                    while let work = threadPool.queues[(queueIndex + i) % numberOfQueues].dequeue() {
+                    let queue = threadPool.queues[(queueIndex + i) % numberOfQueues]
+                    while let work = queue.dequeue() {
                         threadPool.workCount.wrappingDecrement(ordering: .relaxed)
                         work.work()
                         threadPool.handleTimedWork()
@@ -273,7 +273,7 @@ final class Worker {
 internal extension ThreadPool {
     static func _createShared() -> ThreadPool {
         //TODO: Get the number of cores somehow. Copy NIOs implementation?
-        return ThreadPool(cacheSize: 1024, numberOfThreads: 2)
+        return ThreadPool(cacheSize: 1024, numberOfThreads: 1)
     }
     
     func _startShared() {
@@ -294,7 +294,7 @@ private let isSharedThreadPoolSetup: ManagedAtomic<Bool> = ManagedAtomic(false)
 
 @_cdecl("setup_shared_threadpool")
 public func __setup_shared_threadpool() {
-    if isSharedThreadPoolSetup.exchange(true, ordering: .relaxed) { return }
+    if isSharedThreadPoolSetup.exchange(true, ordering: .sequentiallyConsistent) { return }
     ThreadPool.shared._startShared()
 }
 #else

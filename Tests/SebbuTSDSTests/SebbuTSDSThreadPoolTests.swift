@@ -16,19 +16,14 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
     func testThreadPoolEnqueueing() {
         let enqueueCount = 10_000_000
         let threadPool = ThreadPool(numberOfThreads: 8)
-        //let threadPool = BoundedThreadPool(size: 100_000, numberOfThreads: 8)
         threadPool.start()
         let counter = ManagedAtomic<Int>((0..<enqueueCount).reduce(0, +))
         for i in 0..<enqueueCount {
             threadPool.run {
                 counter.wrappingDecrement(by: i, ordering: .relaxed)
             }
-            while (false) {
-                print("Full!!")
-            }
         }
         while counter.load(ordering: .relaxed) != 0 { Thread.sleep(forTimeInterval: 0.01) }
-        threadPool.stop()
     }
     
     func testSharedThreadPoolEnqueueing() {
@@ -101,10 +96,17 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         }
         
         let start = DispatchTime.now().uptimeNanoseconds
-        while counter.load(ordering: .relaxed) != 0 {}
+        while counter.load(ordering: .relaxed) > 0 {
+            let currentTime = DispatchTime.now().uptimeNanoseconds
+            if currentTime - start > 10_000_000_000 {
+                XCTFail("Test took too long...")
+                return
+            }
+        }
         let end = DispatchTime.now().uptimeNanoseconds
         threadPool.stop()
         XCTAssertGreaterThanOrEqual(Double(end - start) / 1_000_000_000.0, 1)
+        XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 10)
     }
 }
 #endif
