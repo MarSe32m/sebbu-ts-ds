@@ -26,6 +26,22 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         while counter.load(ordering: .relaxed) != 0 { Thread.sleep(forTimeInterval: 0.01) }
     }
     
+    func testBoundedThreadPoolEnqueueing() {
+        let enqueueCount = 10_000_000
+        let threadPool = BoundedThreadPool(size: 100_000, numberOfThreads: 8)
+        threadPool.start()
+        let counter = ManagedAtomic<Int>((0..<enqueueCount).reduce(0, +))
+        for i in 0..<enqueueCount {
+            while true {
+                let enqueued = threadPool.run {
+                    counter.wrappingDecrement(by: i, ordering: .relaxed)
+                }
+                if enqueued { break }
+            }
+        }
+        while counter.load(ordering: .relaxed) != 0 { Thread.sleep(forTimeInterval: 0.01) }
+    }
+    
     func testSharedThreadPoolEnqueueing() {
         let enqueueCount = 10000000
         let counter = ManagedAtomic<Int>((0..<enqueueCount).reduce(0, +))
@@ -47,6 +63,26 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
             for i in 0...enqueueCount {
                 threadPool.run {
                     counter.wrappingDecrement(by: i, ordering: .relaxed)
+                }
+            }
+        }
+        while counter.load(ordering: .relaxed) != 0 {}
+        threadPool.stop()
+    }
+    
+    func testBoundedThreadPoolEnqueueingFromMultipleThreads() {
+        let enqueueCount = 1000000
+        let enqueueingThreadCount = 6
+        let threadPool = BoundedThreadPool(size: 100000, numberOfThreads: 6)
+        threadPool.start()
+        let counter = ManagedAtomic<Int>((0...enqueueCount).reduce(0, +) * enqueueingThreadCount)
+        DispatchQueue.concurrentPerform(iterations: enqueueingThreadCount) { thread in
+            for i in 0...enqueueCount {
+                while true {
+                    let enqueued = threadPool.run {
+                        counter.wrappingDecrement(by: i, ordering: .relaxed)
+                    }
+                    if enqueued { break }
                 }
             }
         }
@@ -76,7 +112,30 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 2)
     }
     
+    func testBoundedThreadPoolWorkStealing() {
+        let enqueueCount = 1000
+        let threadPool = BoundedThreadPool(size: 100_000, numberOfThreads: 10)
+        threadPool.start()
+        let counter = ManagedAtomic<Int>(enqueueCount)
+        for i in 0..<enqueueCount {
+            let _ = threadPool.run {
+                if i % 10 == 0 {
+                    // Since the enqueueing strategy is round robin, we load the first thread with
+                    // "heavy computation" work
+                    Thread.sleep(forTimeInterval: 0.1)
+                }
+                counter.wrappingDecrement(ordering: .relaxed)
+            }
+        }
+        let start = DispatchTime.now().uptimeNanoseconds
+        while counter.load(ordering: .relaxed) != 0 {}
+        let end = DispatchTime.now().uptimeNanoseconds
+        threadPool.stop()
+        XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 2)
+    }
+    
     func testThreadPoolRunAfter() {
+        //TODO: See whats up with this test. Keeps failing randomly. Maybe flawed logic in the ThreadPool implementation
         let enqueueCount = 1000
         let threadPool = ThreadPool(numberOfThreads: 5)
         threadPool.start()
@@ -85,6 +144,39 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         
         func enqueue() {
             threadPool.run(after: 10_000_000) {
+                if itemsToEnqueue.wrappingDecrementThenLoad(ordering: .relaxed) < 0 { return }
+                counter.wrappingDecrement(ordering: .relaxed)
+                enqueue()
+            }
+        }
+        
+        for _ in 0..<5 {
+            enqueue()
+        }
+        
+        let start = DispatchTime.now().uptimeNanoseconds
+        while counter.load(ordering: .relaxed) > 0 {
+            let currentTime = DispatchTime.now().uptimeNanoseconds
+            if currentTime - start > 10_000_000_000 {
+                XCTFail("Test took too long. Counters left: \(counter.load(ordering: .relaxed))")
+                return
+            }
+        }
+        let end = DispatchTime.now().uptimeNanoseconds
+        threadPool.stop()
+        XCTAssertGreaterThanOrEqual(Double(end - start) / 1_000_000_000.0, 1)
+        XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 10)
+    }
+    
+    func testBoundedThreadPoolRunAfter() {
+        let enqueueCount = 1000
+        let threadPool = BoundedThreadPool(size: 100_000, numberOfThreads: 5)
+        threadPool.start()
+        let counter = ManagedAtomic<Int>(enqueueCount)
+        let itemsToEnqueue = ManagedAtomic<Int>(enqueueCount)
+        
+        func enqueue() {
+            let _ = threadPool.run(after: 10_000_000) {
                 if itemsToEnqueue.wrappingDecrementThenLoad(ordering: .relaxed) < 0 { return }
                 counter.wrappingDecrement(ordering: .relaxed)
                 enqueue()

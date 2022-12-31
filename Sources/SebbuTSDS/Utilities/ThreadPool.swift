@@ -100,7 +100,7 @@ public final class ThreadPool {
     public func start() {
         if started.exchange(true, ordering: .relaxed) { return }
         for index in 0..<numberOfThreads {
-            let worker = Worker(threadPool: self, index: index)
+            let worker = Worker(threadPool: self)
             let thread = Thread {
                 worker.run()
             }
@@ -126,6 +126,7 @@ public final class ThreadPool {
     public final func run(after nanoseconds: UInt64, _ block: @escaping () -> ()) {
         let deadline = DispatchTime.now().uptimeNanoseconds + nanoseconds
         timedWorkQueue.enqueue(TimedWork(block, deadline))
+        run { self.handleTimedWork() }
         semaphore.signal()
     }
 
@@ -137,7 +138,7 @@ public final class ThreadPool {
         
         // Move the enqueued work into the priority queue
         for work in timedWorkQueue {
-            timedWork.insert(TimedWork(work.work, work.deadline))
+            timedWork.insert(work)
         }
         
         // Process the priority queue
@@ -224,17 +225,18 @@ final class Worker {
     @usableFromInline
     let running: ManagedAtomic<Bool> = ManagedAtomic(false)
     
+    @usableFromInline
     let threadPool: ThreadPool
     
-    private let index: Int
-    private let numberOfQueues: Int
+    @usableFromInline
+    let numberOfQueues: Int
     
-    init(threadPool: ThreadPool, index: Int) {
+    init(threadPool: ThreadPool) {
         self.threadPool = threadPool
         self.numberOfQueues = threadPool.queues.count
-        self.index = index
     }
     
+    @inlinable
     public func run() {
         running.store(true, ordering: .relaxed)
         while running.load(ordering: .relaxed) {
@@ -279,7 +281,7 @@ internal extension ThreadPool {
     func _startShared() {
         if started.exchange(true, ordering: .relaxed) { return }
         for index in 0..<numberOfThreads {
-            let worker = Worker(threadPool: self, index: index)
+            let worker = Worker(threadPool: self)
             let thread = Thread {
                 worker.run()
             }
