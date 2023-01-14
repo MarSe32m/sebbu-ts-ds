@@ -13,7 +13,7 @@
 #define hardware_pause() __asm__("")
 #endif
 
-inline __attribute((always_inline)) void _hardware_pause() {
+static inline __attribute((always_inline)) void _hardware_pause() {
     hardware_pause();
 }
 
