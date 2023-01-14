@@ -4,11 +4,13 @@
 //
 //  Created by Sebastian Toivonen on 30.12.2022.
 //
-#if canImport(Atomics)
-import Atomics
+
 import Dispatch
 import Foundation
 import HeapModule
+
+#if canImport(Atomics)
+import Atomics
 
 public final class BoundedThreadPool {
     @usableFromInline
@@ -25,6 +27,9 @@ public final class BoundedThreadPool {
     
     @usableFromInline
     internal let running: ManagedAtomic<Bool> = ManagedAtomic(false)
+    
+    @usableFromInline
+    internal let nextTimedWorkDeadline: ManagedAtomic<UInt64> = ManagedAtomic(0)
     
     @usableFromInline
     internal let handlingTimedWork: ManagedAtomic<Bool> = ManagedAtomic(false)
@@ -66,9 +71,8 @@ public final class BoundedThreadPool {
     }
 
     @inlinable
-    @discardableResult
-    internal func handleTimedWork() -> Int {
-        if handlingTimedWork.exchange(true, ordering: .acquiring) { return 0 }
+    internal func handleTimedWork() {
+        if handlingTimedWork.exchange(true, ordering: .acquiring) { return }
         defer { handlingTimedWork.store(false, ordering: .releasing) }
         
         // Move the enqueued work into the priority queue
@@ -80,17 +84,16 @@ public final class BoundedThreadPool {
         let currentTime = DispatchTime.now().uptimeNanoseconds
         while let workItem = timedWork.max() {
             if workItem.deadline > currentTime {
-                return currentTime.distance(to: workItem.deadline)
+                nextTimedWorkDeadline.store(workItem.deadline, ordering: .relaxed)
+                return
             }
             
             let workItem = timedWork.removeMax()
             // Enqueue the work to a worker thread
             if !run(workItem.work) {
                 workItem.work()
-                return 1
             }
         }
-        return 0
     }
     
     public final func stop() {
@@ -154,15 +157,15 @@ extension BoundedThreadPool {
         public func run() {
             running.store(true, ordering: .relaxed)
             while threadPool.running.load(ordering: .relaxed) {
+                threadPool.handleTimedWork()
                 while let work = threadPool.workQueue.dequeue() {
                     work.work()
                     threadPool.handleTimedWork()
                 }
                 
-                let sleepTime = threadPool.handleTimedWork()
-                if _slowPath(sleepTime > 0) {
-                    if sleepTime == 1 { continue }
-                    _ = threadPool.semaphore.wait(timeout: .now() + .nanoseconds(sleepTime))
+                let deadline = threadPool.nextTimedWorkDeadline.exchange(0, ordering: .relaxed)
+                if _slowPath(deadline > 0) {
+                    _ = threadPool.semaphore.wait(timeout: .init(uptimeNanoseconds: deadline))
                 } else {
                     threadPool.semaphore.wait()
                 }
@@ -177,6 +180,157 @@ extension BoundedThreadPool {
         deinit {
             stop()
             running.destroy()
+        }
+    }
+}
+#else
+public final class BoundedThreadPool {
+    
+    @usableFromInline
+    internal let globalQueue: LockedBoundedQueue<Work>
+    
+    @usableFromInline
+    internal let timedWorkQueue: MPSCQueue<TimedWork>
+    
+    public let numberOfThreads: Int
+    
+    @usableFromInline
+    internal var workers: [Worker] = []
+    
+    @usableFromInline
+    internal var timedWork: Heap<TimedWork> = Heap()
+    
+    @usableFromInline
+    internal let timedWorkLock: Lock = Lock()
+    
+    @usableFromInline
+    internal let semaphore = DispatchSemaphore(value: 0)
+    
+    @usableFromInline
+    internal var started: Bool = false
+    
+    @usableFromInline
+    internal let startedLock: Lock = Lock()
+    
+    public init(size: Int = 1024, numberOfThreads: Int) {
+        assert(numberOfThreads > 0)
+        self.timedWorkQueue = MPSCQueue(cacheSize: size)
+        self.globalQueue = LockedBoundedQueue(size: size)
+        self.numberOfThreads = numberOfThreads
+    }
+    
+    public func start() {
+        let started = startedLock.withLock { self.started }
+        if started { return }
+        for index in 0..<numberOfThreads {
+            let worker = Worker(threadPool: self)
+            let thread = Thread {
+                worker.run()
+            }
+            thread.name = "SebbuTSDS-Worker-Thread-\(index)"
+            thread.start()
+            workers.append(worker)
+        }
+    }
+    
+    @inlinable
+    public func run(operation: @escaping () -> ()) -> Bool {
+        assert({startedLock.withLock { self.started }}(), "The ThreadPool wasn't started before block were submitted")
+        assert(!workers.isEmpty)
+        let work = Work(operation)
+        if globalQueue.enqueue(work) {
+            semaphore.signal()
+            return true
+        }
+        return false
+    }
+    
+    @inlinable
+    public final func run(after nanoseconds: UInt64, _ block: @escaping () -> ()) {
+        let deadline = DispatchTime.now().uptimeNanoseconds + nanoseconds
+        timedWorkQueue.enqueue(TimedWork(block, deadline))
+        semaphore.signal()
+    }
+
+    @inlinable
+    @discardableResult
+    internal func handleTimedWork() -> UInt64 {
+        if !timedWorkLock.tryLock() { return 0 }
+        defer { timedWorkLock.unlock() }
+        
+        // Move the enqueued work into the priority queue
+        for work in timedWorkQueue {
+            timedWork.insert(work)
+        }
+        
+        // Process the priority queue
+        var currentTime = DispatchTime.now().uptimeNanoseconds
+        while let workItem = timedWork.max() {
+            if workItem.deadline > currentTime {
+                return workItem.deadline
+            }
+            let workItem = timedWork.removeMax()
+            // Enqueue the work to a worker thread
+            if !run(operation: workItem.work) {
+                workItem.work()
+                currentTime = DispatchTime.now().uptimeNanoseconds
+            }
+        }
+        return 0
+    }
+    
+    public func stop() {
+        workers.forEach { $0.stop() }
+        workers.removeAll()
+        startedLock.withLock { self.started = false }
+    }
+}
+
+extension BoundedThreadPool {
+    @usableFromInline
+    final class Worker {
+        @usableFromInline
+        var running: Bool = false
+        
+        @usableFromInline
+        let runningLock: Lock = Lock()
+        
+        @usableFromInline
+        let threadPool: BoundedThreadPool
+        
+        init(threadPool: BoundedThreadPool) {
+            self.threadPool = threadPool
+        }
+        
+        @inlinable
+        public func run() {
+            runningLock.withLock { running = true }
+            while true {
+                if !runningLock.withLock({
+                    running
+                }) { return }
+                threadPool.handleTimedWork()
+                while let work = threadPool.globalQueue.dequeue() {
+                    work.work()
+                    threadPool.handleTimedWork()
+                }
+                
+                let deadline = threadPool.handleTimedWork()
+                if _slowPath(deadline > 0) {
+                    _ = threadPool.semaphore.wait(timeout: .init(uptimeNanoseconds: deadline))
+                } else {
+                    threadPool.semaphore.wait()
+                }
+            }
+        }
+        
+        public func stop() {
+            runningLock.withLock { running = false }
+            threadPool.semaphore.signal()
+        }
+        
+        deinit {
+            stop()
         }
     }
 }

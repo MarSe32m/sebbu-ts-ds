@@ -83,6 +83,9 @@ public final class ThreadPool {
     internal let workCount: ManagedAtomic<Int> = ManagedAtomic(0)
     
     @usableFromInline
+    internal let nextTimedWorkDeadline: ManagedAtomic<UInt64> = ManagedAtomic(0)
+    
+    @usableFromInline
     internal let semaphore = DispatchSemaphore(value: 0)
     
     @usableFromInline
@@ -136,14 +139,12 @@ public final class ThreadPool {
     public final func run(after nanoseconds: UInt64, _ block: @escaping () -> ()) {
         let deadline = DispatchTime.now().uptimeNanoseconds + nanoseconds
         timedWorkQueue.enqueue(TimedWork(block, deadline))
-        run { self.handleTimedWork() }
         semaphore.signal()
     }
 
     @inlinable
-    @discardableResult
-    internal func handleTimedWork() -> Int {
-        if handlingTimedWork.exchange(true, ordering: .acquiring) { return 0 }
+    internal func handleTimedWork() {
+        if handlingTimedWork.exchange(true, ordering: .acquiring) { return }
         defer { handlingTimedWork.store(false, ordering: .releasing) }
         
         // Move the enqueued work into the priority queue
@@ -155,13 +156,13 @@ public final class ThreadPool {
         let currentTime = DispatchTime.now().uptimeNanoseconds
         while let workItem = timedWork.max() {
             if workItem.deadline > currentTime {
-                return currentTime.distance(to: workItem.deadline)
+                nextTimedWorkDeadline.store(workItem.deadline, ordering: .relaxed)
+                return
             }
             let workItem = timedWork.removeMax()
             // Enqueue the work to a worker thread
             run(operation: workItem.work)
         }
-        return 0
     }
     
     public func stop() {
@@ -192,6 +193,262 @@ public final class ThreadPool {
         return index
     }
 }
+
+extension ThreadPool {
+    @usableFromInline
+    final class Worker {
+        
+        @usableFromInline
+        let running: ManagedAtomic<Bool> = ManagedAtomic(false)
+        
+        @usableFromInline
+        let threadPool: ThreadPool
+        
+        @usableFromInline
+        let numberOfQueues: Int
+        
+        init(threadPool: ThreadPool) {
+            self.threadPool = threadPool
+            self.numberOfQueues = threadPool.queues.count
+        }
+        
+        @inlinable
+        public func run() {
+            running.store(true, ordering: .relaxed)
+            while running.load(ordering: .relaxed) {
+                threadPool.handleTimedWork()
+                // Algo 1
+                repeat {
+                    let queueIndex = threadPool.getQueueIndex()
+                    for i in 0..<numberOfQueues {
+                        let queue = threadPool.queues[(queueIndex + i) % numberOfQueues]
+                        while let work = queue.dequeue() {
+                            threadPool.workCount.wrappingDecrement(ordering: .relaxed)
+                            work.work()
+                            threadPool.handleTimedWork()
+                        }
+                    }
+                } while threadPool.workCount.load(ordering: .relaxed) > 0
+                
+                let deadline = threadPool.nextTimedWorkDeadline.exchange(0, ordering: .relaxed)
+                if deadline > 0 {
+                    _ = threadPool.semaphore.wait(timeout: .init(uptimeNanoseconds: deadline))
+                } else {
+                    threadPool.semaphore.wait()
+                }
+            }
+        }
+        
+        public func stop() {
+            running.store(false, ordering: .relaxed)
+            threadPool.semaphore.signal()
+        }
+        
+        deinit {
+            stop()
+        }
+    }
+}
+
+internal extension ThreadPool {
+    func _startShared() {
+        if started.exchange(true, ordering: .relaxed) { return }
+        for index in 0..<numberOfThreads {
+            let worker = Worker(threadPool: self)
+            let thread = Thread {
+                worker.run()
+            }
+            thread.name = "SebbuTSDS-Shared-Worker-Thread-\(index)"
+            thread.start()
+            workers.append(worker)
+        }
+    }
+}
+
+//@_cdecl("setup_shared_threadpool")
+//public func __setup_shared_threadpool() {
+//  setupSharedThreadpool()::..
+//}
+#else
+public final class ThreadPool {
+    public static let shared: ThreadPool = ThreadPool(isShared: true)
+    
+    @usableFromInline
+    internal var isShared: Bool = false
+    
+    @usableFromInline
+    internal let globalQueue: LockedQueue<Work>
+    
+    @usableFromInline
+    internal let timedWorkQueue: MPSCQueue<TimedWork>
+    
+    public let numberOfThreads: Int
+    
+    @usableFromInline
+    internal var workers: [Worker] = []
+    
+    @usableFromInline
+    internal var timedWork: Heap<TimedWork> = Heap()
+    
+    @usableFromInline
+    internal let timedWorkLock: Lock = Lock()
+    
+    @usableFromInline
+    internal let semaphore = DispatchSemaphore(value: 0)
+    
+    @usableFromInline
+    internal var started: Bool = false
+    
+    @usableFromInline
+    internal let startedLock: Lock = Lock()
+    
+    private init(cacheSize: Int = 1024, isShared: Bool) {
+        assert(isShared, "This initializer is only for the shared threadpool")
+        let numberOfThreads = ProcessInfo.processInfo.activeProcessorCount
+        self.timedWorkQueue = MPSCQueue(cacheSize: cacheSize)
+        self.globalQueue = LockedQueue(cacheSize: cacheSize)
+        self.numberOfThreads = numberOfThreads
+        self.isShared = true
+        _startShared()
+    }
+    
+    public init(cacheSize: Int = 1024, numberOfThreads: Int) {
+        assert(numberOfThreads > 0)
+        self.timedWorkQueue = MPSCQueue(cacheSize: cacheSize)
+        self.globalQueue = LockedQueue(cacheSize: cacheSize)
+        self.numberOfThreads = numberOfThreads
+    }
+    
+    public func start() {
+        // Shared ThreadPool is started automatically
+        if isShared { return }
+        let started = startedLock.withLock { self.started }
+        if started { return }
+        for index in 0..<numberOfThreads {
+            let worker = Worker(threadPool: self)
+            let thread = Thread {
+                worker.run()
+            }
+            thread.name = "SebbuTSDS-Worker-Thread-\(index)"
+            thread.start()
+            workers.append(worker)
+        }
+    }
+    
+    @inlinable
+    public func run(operation: @escaping () -> ()) {
+        assert({startedLock.withLock { self.started }}(), "The ThreadPool wasn't started before block were submitted")
+        assert(!workers.isEmpty)
+        let work = Work(operation)
+        globalQueue.enqueue(work)
+        semaphore.signal()
+    }
+    
+    @inlinable
+    public final func run(after nanoseconds: UInt64, _ block: @escaping () -> ()) {
+        let deadline = DispatchTime.now().uptimeNanoseconds + nanoseconds
+        timedWorkQueue.enqueue(TimedWork(block, deadline))
+        semaphore.signal()
+    }
+
+    @inlinable
+    @discardableResult
+    internal func handleTimedWork() -> UInt64 {
+        if !timedWorkLock.tryLock() { return 0 }
+        defer { timedWorkLock.unlock() }
+        
+        // Move the enqueued work into the priority queue
+        for work in timedWorkQueue {
+            timedWork.insert(work)
+        }
+        
+        // Process the priority queue
+        let currentTime = DispatchTime.now().uptimeNanoseconds
+        while let workItem = timedWork.max() {
+            if workItem.deadline > currentTime {
+                return workItem.deadline
+            }
+            let workItem = timedWork.removeMax()
+            // Enqueue the work to a worker thread
+            run(operation: workItem.work)
+        }
+        return 0
+    }
+    
+    public func stop() {
+        // End users cannot manually stop the shared ThreadPool
+        if isShared { return }
+        workers.forEach { $0.stop() }
+        workers.removeAll()
+        startedLock.withLock { self.started = false }
+    }
+}
+
+
+extension ThreadPool {
+    @usableFromInline
+    final class Worker {
+        @usableFromInline
+        var running: Bool = false
+        
+        @usableFromInline
+        let runningLock: Lock = Lock()
+        
+        @usableFromInline
+        let threadPool: ThreadPool
+        
+        init(threadPool: ThreadPool) {
+            self.threadPool = threadPool
+        }
+        
+        @inlinable
+        public func run() {
+            runningLock.withLock { running = true }
+            while true {
+                if !runningLock.withLock({
+                    running
+                }) { return }
+                threadPool.handleTimedWork()
+                while let work = threadPool.globalQueue.dequeue() {
+                    work.work()
+                    threadPool.handleTimedWork()
+                }
+                
+                let deadline = threadPool.handleTimedWork()
+                if _slowPath(deadline > 0) {
+                    _ = threadPool.semaphore.wait(timeout: .init(uptimeNanoseconds: deadline))
+                } else {
+                    threadPool.semaphore.wait()
+                }
+            }
+        }
+        
+        public func stop() {
+            runningLock.withLock { running = false }
+            threadPool.semaphore.signal()
+        }
+        
+        deinit {
+            stop()
+        }
+    }
+}
+
+internal extension ThreadPool {
+    func _startShared() {
+        if startedLock.withLock({ self.started }) { return }
+        for index in 0..<numberOfThreads {
+            let worker = Worker(threadPool: self)
+            let thread = Thread {
+                worker.run()
+            }
+            thread.name = "SebbuTSDS-Shared-Worker-Thread-\(index)"
+            thread.start()
+            workers.append(worker)
+        }
+    }
+}
+#endif
 
 @usableFromInline
 internal final class Work {
@@ -228,79 +485,3 @@ internal final class TimedWork: Comparable {
         lhs.deadline == rhs.deadline
     }
 }
-
-@usableFromInline
-final class Worker {
-    
-    @usableFromInline
-    let running: ManagedAtomic<Bool> = ManagedAtomic(false)
-    
-    @usableFromInline
-    let threadPool: ThreadPool
-    
-    @usableFromInline
-    let numberOfQueues: Int
-    
-    init(threadPool: ThreadPool) {
-        self.threadPool = threadPool
-        self.numberOfQueues = threadPool.queues.count
-    }
-    
-    @inlinable
-    public func run() {
-        running.store(true, ordering: .relaxed)
-        while running.load(ordering: .relaxed) {
-            // Algo 1
-            repeat {
-                let queueIndex = threadPool.getQueueIndex()
-                for i in 0..<numberOfQueues {
-                    let queue = threadPool.queues[(queueIndex + i) % numberOfQueues]
-                    while let work = queue.dequeue() {
-                        threadPool.workCount.wrappingDecrement(ordering: .relaxed)
-                        work.work()
-                        threadPool.handleTimedWork()
-                    }
-                }
-            } while threadPool.workCount.load(ordering: .relaxed) > 0
-            
-            let sleepTime = threadPool.handleTimedWork()
-            if _slowPath(sleepTime > 0) {
-                _ = threadPool.semaphore.wait(timeout: .now() + .nanoseconds(sleepTime))
-            } else {
-                threadPool.semaphore.wait()
-            }
-        }
-    }
-    
-    public func stop() {
-        running.store(false, ordering: .relaxed)
-        threadPool.semaphore.signal()
-    }
-    
-    deinit {
-        stop()
-    }
-}
-
-internal extension ThreadPool {
-    func _startShared() {
-        if started.exchange(true, ordering: .relaxed) { return }
-        for index in 0..<numberOfThreads {
-            let worker = Worker(threadPool: self)
-            let thread = Thread {
-                worker.run()
-            }
-            thread.name = "SebbuTSDS-Shared-Worker-Thread-\(index)"
-            thread.start()
-            workers.append(worker)
-        }
-    }
-}
-
-//@_cdecl("setup_shared_threadpool")
-//public func __setup_shared_threadpool() {
-//  setupSharedThreadpool()::..
-//}
-#endif
-
-

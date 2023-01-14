@@ -24,6 +24,7 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
             }
         }
         while counter.load(ordering: .relaxed) != 0 { Thread.sleep(forTimeInterval: 0.01) }
+        threadPool.stop()
     }
     
     func testBoundedThreadPoolEnqueueing() {
@@ -40,6 +41,7 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
             }
         }
         while counter.load(ordering: .relaxed) != 0 { Thread.sleep(forTimeInterval: 0.01) }
+        threadPool.stop()
     }
     
     func testSharedThreadPoolEnqueueing() {
@@ -108,8 +110,8 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         let start = DispatchTime.now().uptimeNanoseconds
         while counter.load(ordering: .relaxed) != 0 {}
         let end = DispatchTime.now().uptimeNanoseconds
-        threadPool.stop()
         XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 2)
+        threadPool.stop()
     }
     
     func testBoundedThreadPoolWorkStealing() {
@@ -130,8 +132,8 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         let start = DispatchTime.now().uptimeNanoseconds
         while counter.load(ordering: .relaxed) != 0 {}
         let end = DispatchTime.now().uptimeNanoseconds
-        threadPool.stop()
         XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 2)
+        threadPool.stop()
     }
     
     func testThreadPoolRunAfter() {
@@ -155,9 +157,42 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
             }
         }
         let end = DispatchTime.now().uptimeNanoseconds
-        threadPool.stop()
         XCTAssertGreaterThanOrEqual(end - start, 1_000_000_000)
         XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 10)
+        threadPool.stop()
+    }
+    
+    func testThreadPoolBatchRunAfter() {
+        let enqueueCount = 1000
+        let threadPool = ThreadPool(numberOfThreads: 5)
+        threadPool.start()
+        let counter = ManagedAtomic<Int>(enqueueCount)
+        let itemsToEnqueue = ManagedAtomic<Int>(enqueueCount)
+        
+        func enqueue() {
+            let _ = threadPool.run(after: 10_000_000) {
+                if itemsToEnqueue.wrappingDecrementThenLoad(ordering: .relaxed) < 0 { return }
+                counter.wrappingDecrement(ordering: .relaxed)
+                enqueue()
+            }
+        }
+        
+        for _ in 0..<5 {
+            enqueue()
+        }
+        
+        let start = DispatchTime.now().uptimeNanoseconds
+        while counter.load(ordering: .relaxed) > 0 {
+            let currentTime = DispatchTime.now().uptimeNanoseconds
+            if currentTime - start > 10_000_000_000 {
+                XCTFail("Test took too long...")
+                return
+            }
+        }
+        let end = DispatchTime.now().uptimeNanoseconds
+        XCTAssertGreaterThanOrEqual(Double(end - start) / 1_000_000_000.0, 1)
+        XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 10)
+        threadPool.stop()
     }
     
     func testBoundedThreadPoolRunAfter() {
@@ -188,9 +223,35 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
             }
         }
         let end = DispatchTime.now().uptimeNanoseconds
-        threadPool.stop()
         XCTAssertGreaterThanOrEqual(Double(end - start) / 1_000_000_000.0, 1)
         XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 10)
+        threadPool.stop()
+    }
+    
+    func testBoundedThreadPoolBatchRunAfter() {
+        let enqueueCount: UInt64 = 1_100
+        let threadPool = BoundedThreadPool(size: 10_000, numberOfThreads: 5)
+        threadPool.start()
+        let counter = ManagedAtomic<UInt64>(enqueueCount)
+        
+        for i: UInt64 in 0..<enqueueCount {
+            threadPool.run(after: i * 1_000_000) {
+                counter.wrappingDecrement(ordering: .relaxed)
+            }
+        }
+        
+        let start = DispatchTime.now().uptimeNanoseconds
+        while counter.load(ordering: .relaxed) != 0 {
+            let currentTime = DispatchTime.now().uptimeNanoseconds
+            if currentTime - start > 10_000_000_000 {
+                XCTFail("Test took too long. Counters left: \(counter.load(ordering: .relaxed))")
+                return
+            }
+        }
+        let end = DispatchTime.now().uptimeNanoseconds
+        XCTAssertGreaterThanOrEqual(end - start, 1_000_000_000)
+        XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 10)
+        threadPool.stop()
     }
 }
 #endif
