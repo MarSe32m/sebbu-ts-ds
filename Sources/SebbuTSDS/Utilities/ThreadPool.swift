@@ -33,27 +33,25 @@ final class Queue {
     }
     
     @inlinable
-    @inline(__always)
     func dequeue() -> Work? {
         for _ in 0..<32 {
             if !processing.exchange(true, ordering: .acquiring) {
                 defer { processing.store(false, ordering: .releasing) }
                 return workQueue.dequeue()
             }
-            _pause()
+            HardwareUtilities.pause()
         }
         return nil
     }
     
     @inlinable
-    //@inline(__always)
     func enqueue(_ work: Work) {
         workQueue.enqueue(work)
     }
 }
 
 public final class ThreadPool {
-    public static let shared: ThreadPool = ThreadPool._createShared()
+    public static let shared: ThreadPool = ThreadPool(isShared: true)
     
     @usableFromInline
     internal var isShared: Bool = false
@@ -90,6 +88,16 @@ public final class ThreadPool {
     @usableFromInline
     internal let started: ManagedAtomic<Bool> = ManagedAtomic(false)
     
+    private init(cacheSize: Int = 1024, isShared: Bool) {
+        assert(isShared, "This initializer is only for the shared threadpool")
+        let numberOfThreads = ProcessInfo.processInfo.activeProcessorCount
+        self.timedWorkQueue = MPSCQueue(cacheSize: cacheSize)
+        self.queues = (0..<numberOfThreads).map { _ in Queue(cacheSize: cacheSize) }
+        self.numberOfThreads = numberOfThreads
+        self.isShared = true
+        _startShared()
+    }
+    
     public init(cacheSize: Int = 1024, numberOfThreads: Int) {
         assert(numberOfThreads > 0)
         self.timedWorkQueue = MPSCQueue(cacheSize: cacheSize)
@@ -98,6 +106,8 @@ public final class ThreadPool {
     }
     
     public func start() {
+        // Shared ThreadPool is started automatically
+        if isShared { return }
         if started.exchange(true, ordering: .relaxed) { return }
         for index in 0..<numberOfThreads {
             let worker = Worker(threadPool: self)
@@ -273,11 +283,6 @@ final class Worker {
 }
 
 internal extension ThreadPool {
-    static func _createShared() -> ThreadPool {
-        //TODO: Get the number of cores somehow. Copy NIOs implementation?
-        return ThreadPool(cacheSize: 1024, numberOfThreads: 1)
-    }
-    
     func _startShared() {
         if started.exchange(true, ordering: .relaxed) { return }
         for index in 0..<numberOfThreads {
@@ -292,18 +297,10 @@ internal extension ThreadPool {
     }
 }
 
-private let isSharedThreadPoolSetup: ManagedAtomic<Bool> = ManagedAtomic(false)
-
-@_cdecl("setup_shared_threadpool")
-public func __setup_shared_threadpool() {
-    if isSharedThreadPoolSetup.exchange(true, ordering: .sequentiallyConsistent) { return }
-    ThreadPool.shared._startShared()
-}
-#else
-@_cdecl("setup_shared_threadpool")
-public func __setup_shared_threadpool() {
-    //If we have no thread pool implementation then we shouldn't set up anything :)
-}
+//@_cdecl("setup_shared_threadpool")
+//public func __setup_shared_threadpool() {
+//  setupSharedThreadpool()::..
+//}
 #endif
 
 

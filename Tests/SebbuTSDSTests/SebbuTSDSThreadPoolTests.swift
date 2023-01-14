@@ -135,27 +135,19 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
     }
     
     func testThreadPoolRunAfter() {
-        //TODO: See whats up with this test. Keeps failing randomly. Maybe flawed logic in the ThreadPool implementation
-        let enqueueCount = 1000
+        let enqueueCount: UInt64 = 1_100
         let threadPool = ThreadPool(numberOfThreads: 5)
         threadPool.start()
-        let counter = ManagedAtomic<Int>(enqueueCount)
-        let itemsToEnqueue = ManagedAtomic<Int>(enqueueCount)
+        let counter = ManagedAtomic<UInt64>(enqueueCount)
         
-        func enqueue() {
-            threadPool.run(after: 10_000_000) {
-                if itemsToEnqueue.wrappingDecrementThenLoad(ordering: .relaxed) < 0 { return }
+        for i: UInt64 in 0..<enqueueCount {
+            threadPool.run(after: i * 1_000_000) {
                 counter.wrappingDecrement(ordering: .relaxed)
-                enqueue()
             }
         }
         
-        for _ in 0..<5 {
-            enqueue()
-        }
-        
         let start = DispatchTime.now().uptimeNanoseconds
-        while counter.load(ordering: .relaxed) > 0 {
+        while counter.load(ordering: .relaxed) != 0 {
             let currentTime = DispatchTime.now().uptimeNanoseconds
             if currentTime - start > 10_000_000_000 {
                 XCTFail("Test took too long. Counters left: \(counter.load(ordering: .relaxed))")
@@ -164,7 +156,7 @@ final class SebbuTSDSThreadPoolTests: XCTestCase {
         }
         let end = DispatchTime.now().uptimeNanoseconds
         threadPool.stop()
-        XCTAssertGreaterThanOrEqual(Double(end - start) / 1_000_000_000.0, 1)
+        XCTAssertGreaterThanOrEqual(end - start, 1_000_000_000)
         XCTAssertLessThanOrEqual(Double(end - start) / 1_000_000_000.0, 10)
     }
     

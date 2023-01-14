@@ -24,7 +24,7 @@ public final class Spinlock: @unchecked Sendable {
             // Wait for the lock to be released without generating cache misses
             while _lock.load(ordering: .relaxed) {
                 //Issue an X86_64 pause or arm yield instruction
-                _pause()
+                HardwareUtilities.pause()
             }
         }
     }

@@ -39,7 +39,8 @@ public enum HardwareUtilities {
     /// Issues a hardware pause
     /// On x86/x64 this is the PAUSE instruction, on ARM this is yield, othewise its a no-op
     @inline(__always)
+    @_transparent
     public static func pause() {
-        CSebbuTSDS._pause()
+        _hardware_pause()
     }
 }
