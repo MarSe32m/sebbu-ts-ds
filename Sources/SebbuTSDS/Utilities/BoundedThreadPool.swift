@@ -26,13 +26,13 @@ public final class BoundedThreadPool {
     internal let semaphore: DispatchSemaphore = DispatchSemaphore(value: 0)
     
     @usableFromInline
-    internal let running: ManagedAtomic<Bool> = ManagedAtomic(false)
+    internal let running: UnsafeAtomic<Bool> = .create(false)
     
     @usableFromInline
-    internal let nextTimedWorkDeadline: ManagedAtomic<UInt64> = ManagedAtomic(0)
+    internal let nextTimedWorkDeadline: UnsafeAtomic<UInt64> = .create(0)
     
     @usableFromInline
-    internal let handlingTimedWork: ManagedAtomic<Bool> = ManagedAtomic(false)
+    internal let handlingTimedWork: UnsafeAtomic<Bool> = .create(false)
     
     public let numberOfThreads: Int
     public let size: Int
@@ -54,6 +54,12 @@ public final class BoundedThreadPool {
             thread.name = "SebbuTSDS-Worker-Thread-\(index)"
             thread.start()
         }
+    }
+    
+    deinit {
+        running.destroy()
+        nextTimedWorkDeadline.destroy()
+        handlingTimedWork.destroy()
     }
     
     public final func run(_ work: @escaping () -> Void) -> Bool {

@@ -12,6 +12,7 @@ import CSebbuTSDS
 extension FixedWidthInteger {
     /// Returns the next power of two.
     @inlinable
+    @_transparent
     func nextPowerOf2() -> Self {
         guard self != 0 else {
             return 1

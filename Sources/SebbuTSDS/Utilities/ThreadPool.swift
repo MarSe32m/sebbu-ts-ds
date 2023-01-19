@@ -25,11 +25,15 @@ final class Queue {
     let workQueue: MPSCQueue<Work>
     
     @usableFromInline
-    let processing: ManagedAtomic<Bool>
+    let processing: UnsafeAtomic<Bool>
     
     init(cacheSize: Int = 4096) {
         self.workQueue = MPSCQueue(cacheSize: cacheSize)
-        self.processing = ManagedAtomic(false)
+        self.processing = .create(false)
+    }
+    
+    deinit {
+        processing.destroy()
     }
     
     @inlinable
@@ -71,25 +75,25 @@ public final class ThreadPool {
     internal var timedWork: Heap<TimedWork> = Heap()
     
     @usableFromInline
-    internal let workerIndex: ManagedAtomic<Int> = ManagedAtomic(0)
+    internal let workerIndex: UnsafeAtomic<Int> = .create(0)
     
     @usableFromInline
-    internal let handlingTimedWork: ManagedAtomic<Bool> = ManagedAtomic(false)
+    internal let handlingTimedWork: UnsafeAtomic<Bool> = .create(false)
     
     @usableFromInline
-    internal let queueIndex: ManagedAtomic<Int> = ManagedAtomic(0)
+    internal let queueIndex: UnsafeAtomic<Int> = .create(0)
     
     @usableFromInline
-    internal let workCount: ManagedAtomic<Int> = ManagedAtomic(0)
+    internal let workCount: UnsafeAtomic<Int> = .create(0)
     
     @usableFromInline
-    internal let nextTimedWorkDeadline: ManagedAtomic<UInt64> = ManagedAtomic(0)
+    internal let nextTimedWorkDeadline: UnsafeAtomic<UInt64> = .create(0)
     
     @usableFromInline
     internal let semaphore = DispatchSemaphore(value: 0)
     
     @usableFromInline
-    internal let started: ManagedAtomic<Bool> = ManagedAtomic(false)
+    internal let started: UnsafeAtomic<Bool> = .create(false)
     
     private init(cacheSize: Int = 1024, isShared: Bool) {
         assert(isShared, "This initializer is only for the shared threadpool")
@@ -106,6 +110,15 @@ public final class ThreadPool {
         self.timedWorkQueue = MPSCQueue(cacheSize: cacheSize)
         self.queues = (0..<numberOfThreads).map { _ in Queue(cacheSize: cacheSize) }
         self.numberOfThreads = numberOfThreads
+    }
+    
+    deinit {
+        workerIndex.destroy()
+        handlingTimedWork.destroy()
+        queueIndex.destroy()
+        workCount.destroy()
+        nextTimedWorkDeadline.destroy()
+        started.destroy()
     }
     
     public func start() {
@@ -199,7 +212,7 @@ extension ThreadPool {
     final class Worker {
         
         @usableFromInline
-        let running: ManagedAtomic<Bool> = ManagedAtomic(false)
+        let running: UnsafeAtomic<Bool> = .create(false)
         
         @usableFromInline
         let threadPool: ThreadPool
@@ -246,6 +259,7 @@ extension ThreadPool {
         
         deinit {
             stop()
+            running.destroy()
         }
     }
 }
