@@ -17,7 +17,7 @@ let package = Package(
     targets: [
         .target(
             name: "SebbuTSDS",
-            dependencies: [.product(name: "Atomics", package: "swift-atomics", condition: .when(platforms: [.iOS, .macOS, .tvOS, .watchOS, .linux])),
+            dependencies: [.product(name: "Atomics", package: "swift-atomics"),
                            .product(name: "DequeModule", package: "swift-collections"),
                            .product(name: "HeapModule", package: "swift-collections"),
                            "CSebbuTSDS"]),
@@ -25,6 +25,6 @@ let package = Package(
         .testTarget(
             name: "SebbuTSDSTests",
             dependencies: ["SebbuTSDS",
-                           .product(name: "Atomics", package: "swift-atomics", condition: .when(platforms: [.iOS, .macOS, .tvOS, .watchOS, .linux]))]),
+                           .product(name: "Atomics", package: "swift-atomics")]),
     ]
 )
