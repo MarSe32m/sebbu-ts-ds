@@ -24,16 +24,13 @@ public final class SPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     }
     
     @usableFromInline
-    internal let size: Int
-    
-    @usableFromInline
     internal let mask: Int
     
     @usableFromInline
     internal var _buffer: UnsafeMutableBufferPointer<BufferNode>
     
     @usableFromInline
-    internal let head = UnsafeAtomic<Int>.create(0)
+    internal let head = UnsafeAtomic<Int>.createCacheAligned(0)
     
     @usableFromInline
     internal var tail = 0
@@ -41,16 +38,15 @@ public final class SPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     public var count: Int {
         let headIndex = head.load(ordering: .relaxed)
         let tailIndex = tail
-        return tailIndex < headIndex ? (size - headIndex + tailIndex) : (tailIndex - headIndex)
+        return tailIndex < headIndex ? (_buffer.count - headIndex + tailIndex) : (tailIndex - headIndex)
     }
     
     public var wasFull: Bool {
-        size - count == 1
+        _buffer.count - count == 1
     }
     
     public init(size: Int) {
         let size = size.nextPowerOf2()
-        self.size = size
         self.mask = size - 1
         self._buffer = .allocate(capacity: size)
         for i in 0..<size {

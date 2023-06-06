@@ -16,5 +16,3 @@
 static inline __attribute((always_inline)) void _hardware_pause() {
     hardware_pause();
 }
-
-//extern void setup_shared_threadpool();

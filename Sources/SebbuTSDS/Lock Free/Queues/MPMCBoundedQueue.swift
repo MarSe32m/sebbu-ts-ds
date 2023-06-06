@@ -23,33 +23,29 @@ public final class MPMCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     }
     
     @usableFromInline
-    internal let size: Int
-    
-    @usableFromInline
     internal let mask: Int
     
     @usableFromInline
     internal let buffer: UnsafeMutableBufferPointer<BufferNode>
     
     @usableFromInline
-    internal var head = UnsafeAtomic<Int>.create(0)
+    internal var head = UnsafeAtomic<Int>.createCacheAligned(0)
     
     @usableFromInline
-    internal var tail = UnsafeAtomic<Int>.create(0)
+    internal var tail = UnsafeAtomic<Int>.createCacheAligned(0)
     
     public var count: Int {
         let headIndex = head.load(ordering: .relaxed)
         let tailIndex = tail.load(ordering: .relaxed)
-        return tailIndex < headIndex ? (size - headIndex + tailIndex) : (tailIndex - headIndex)
+        return tailIndex < headIndex ? (buffer.count - headIndex + tailIndex) : (tailIndex - headIndex)
     }
     
     public var wasFull: Bool {
-        size - count == 1
+        buffer.count - count == 1
     }
     
     public init(size: Int) {
         let size = size.nextPowerOf2()
-        self.size = size
         self.mask = size - 1
         self.buffer = .allocate(capacity: size)
         for i in 0..<size {

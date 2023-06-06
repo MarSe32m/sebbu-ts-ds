@@ -24,9 +24,6 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     }
     
     @usableFromInline
-    internal let size: Int
-    
-    @usableFromInline
     internal let mask: Int
     
     @usableFromInline
@@ -36,7 +33,7 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     internal var head: Int = 0
     
     @usableFromInline
-    internal let tail = UnsafeAtomic<Int>.create(0)
+    internal let tail = UnsafeAtomic<Int>.createCacheAligned(0)
     
     @inlinable
     public var count: Int {
@@ -47,7 +44,7 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     
     @inlinable
     public var wasFull: Bool {
-        size - count == 1
+        _buffer.count - count == 1
     }
     
     @inlinable
@@ -60,7 +57,6 @@ public final class MPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     
     public init(size: Int) {
         let size = size.nextPowerOf2()
-        self.size = size
         self.mask = size - 1
         self._buffer = .allocate(capacity: size)
         for i in 0..<size {

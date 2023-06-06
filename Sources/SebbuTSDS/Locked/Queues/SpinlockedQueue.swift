@@ -10,7 +10,7 @@ import DequeModule
 /// An unbounded locked queue
 public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     @usableFromInline
-    internal let lock = Lock()
+    internal let lock = Spinlock()
     
     @usableFromInline
     internal var _storage: Deque<Element> = Deque()

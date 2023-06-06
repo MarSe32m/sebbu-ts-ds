@@ -9,7 +9,9 @@ import Atomics
 
 public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     /// The size of the queue
-    public let size: Int
+    public var size: Int {
+        buffer.count - 1
+    }
     
     @usableFromInline
     internal let mask: Int
@@ -18,13 +20,13 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     internal var buffer: UnsafeMutableBufferPointer<Element?>
     
     @usableFromInline
-    internal let head = UnsafeAtomic<Int>.create(0)
+    internal let tail = UnsafeAtomic<Int>.createCacheAligned(0)
     
     @usableFromInline
     internal var headCached: Int = 0
     
     @usableFromInline
-    internal let tail = UnsafeAtomic<Int>.create(0)
+    internal let head = UnsafeAtomic<Int>.createCacheAligned(0)
     
     @usableFromInline
     internal var tailCached: Int = 0
@@ -33,12 +35,12 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     public var count: Int {
         let headIndex = head.load(ordering: .relaxed)
         let tailIndex = tail.load(ordering: .relaxed)
-        return tailIndex < headIndex ? (buffer.count - headIndex + tailIndex) : (tailIndex - headIndex)
+        return tailIndex < headIndex ? (buffer.count - 1 - headIndex + tailIndex) : (tailIndex - headIndex)
     }
     
     @inlinable
     public var wasFull: Bool {
-        size - count == 1
+        buffer.count - 1 - count == 1
     }
     
     @inlinable
@@ -55,7 +57,6 @@ public final class SPSCBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendab
     
     public init(size: Int) {
         precondition(size >= 2, "Queue capacity too small")
-        self.size = size.nextPowerOf2()
         self.mask = size.nextPowerOf2() - 1
         self.buffer = UnsafeMutableBufferPointer.allocate(capacity: size.nextPowerOf2() + 1)
         self.buffer.initialize(repeating: nil)

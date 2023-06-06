@@ -47,8 +47,8 @@ public final class MPSCQueue<Element>: ConcurrentQueue, @unchecked Sendable {
     public init(cacheSize: Int = 1024) {
         let node = UnsafeMutablePointer<BufferNode>.allocate(capacity: 1)
         node.initialize(to: BufferNode(data: nil))
-        self.head = .create(node)
-        self.tail = .create(node)
+        self.head = .createCacheAligned(node)
+        self.tail = .createCacheAligned(node)
         self.cache = SPMCBoundedQueue(size: cacheSize)
     }
     
