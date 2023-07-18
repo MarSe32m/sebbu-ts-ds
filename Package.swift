@@ -1,4 +1,4 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.6
 
 import PackageDescription
 
@@ -11,8 +11,9 @@ let package = Package(
             targets: ["SebbuTSDS"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-atomics.git", .branch("main")),
-        .package(url: "https://github.com/apple/swift-collections.git", .branch("main"))
+        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.1.0"),
+        //TODO: Use a version that includes HeapModule
+        .package(url: "https://github.com/apple/swift-collections.git", branch: "main")
     ],
     targets: [
         .target(

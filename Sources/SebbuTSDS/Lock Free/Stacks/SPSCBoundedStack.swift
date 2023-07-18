@@ -1,14 +1,14 @@
 //
-//  MPMCBoundedStack.swift
+//  SPSCBoundedStack.swift
 //  
 //
-//  Created by Sebastian Toivonen on 26.4.2022.
+//  Created by Sebastian Toivonen on 2.6.2023.
 //
 
 #if canImport(Atomics)
 import Atomics
 
-public final class MPMCBoundedStack<Element>: ConcurrentStack, @unchecked Sendable {
+public final class SPSCBoundedStack<Element>: ConcurrentStack, @unchecked Sendable {
     @usableFromInline
     internal struct BufferNode {
         @usableFromInline
@@ -91,13 +91,13 @@ public final class MPMCBoundedStack<Element>: ConcurrentStack, @unchecked Sendab
     }
 }
 
-extension MPMCBoundedStack: Sequence {
+extension SPSCBoundedStack: Sequence {
     public struct Iterator: IteratorProtocol {
         @usableFromInline
-        internal let stack: MPMCBoundedStack<Element>
+        internal let stack: SPSCBoundedStack<Element>
         
         @inlinable
-        internal init(stack: MPMCBoundedStack<Element>) {
+        internal init(stack: SPSCBoundedStack<Element>) {
             self.stack = stack
         }
         
