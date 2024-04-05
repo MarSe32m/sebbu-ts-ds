@@ -167,7 +167,7 @@ public final class ThreadPool {
         
         // Process the priority queue
         let currentTime = DispatchTime.now().uptimeNanoseconds
-        while let workItem = timedWork.max() {
+        while let workItem = timedWork.max {
             if workItem.deadline > currentTime {
                 nextTimedWorkDeadline.store(workItem.deadline, ordering: .relaxed)
                 return

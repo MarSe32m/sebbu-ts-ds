@@ -77,7 +77,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     @inlinable
     public func min() -> Element? {
         lock.withLock {
-            _heap.min()
+            _heap.min
         }
     }
 
@@ -87,7 +87,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     @inlinable
     public func max() -> Element? {
         lock.withLock {
-            _heap.max()
+            _heap.max
         }
     }
 
