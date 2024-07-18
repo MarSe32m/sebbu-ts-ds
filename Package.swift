@@ -1,10 +1,10 @@
-// swift-tools-version:5.7
+// swift-tools-version:5.10
 
 import PackageDescription
 
 let package = Package(
     name: "sebbu-ts-ds",
-    platforms: [.macOS(.v10_12), .iOS(.v10)],
+    platforms: [.macOS(.v13), .iOS(.v16)],
     products: [
         .library(
             name: "SebbuTSDS",
