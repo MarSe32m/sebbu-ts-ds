@@ -64,7 +64,7 @@ public final class BoundedThreadPool {
     
     public final func run(_ work: @escaping () -> Void) -> Bool {
         let work = Work(work: work)
-        let enqueued = workQueue.enqueue(work)
+        let enqueued: Bool = workQueue.enqueue(work)
         semaphore.signal()
         return enqueued
     }

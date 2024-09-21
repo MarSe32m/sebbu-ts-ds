@@ -8,307 +8,213 @@
 import SebbuTSDS
 import Dispatch
 import XCTest
+import Synchronization
 
 internal class Object {
     let age: Int
+    static let count: Atomic<Int> = Atomic<Int>(0)
     
     init(_ age: Int) {
         self.age = age
+        Object.count.add(1, ordering: .relaxed)
+    }
+
+    deinit {
+        Object.count.subtract(1, ordering: .relaxed)
     }
 }
 
-internal func test<T: ConcurrentQueue>(queue: T, singleWriter: Bool, singleReader: Bool) where T.Element == Object {
-    if singleReader && !singleWriter {
-        DispatchQueue.concurrentPerform(iterations: 8) { i in
-            if i == 0 {
-                for _ in 0..<7 * 10000 {
-                    while true {
-                        if queue.dequeue() != nil {
-                            break
-                        }
-                    }
-                }
-            } else {
-                for j in 0..<10000 {
-                    while !queue.enqueue(Object(j)){}
+internal func test<T: ConcurrentQueue>(queue: T, singleWriter: Bool, singleReader: Bool) async where T.Element == Object {
+    let writers = singleWriter ? 1 : 8
+    let readers = singleReader ? 1 : 8
+    let elementCount = 80_000
+    await withDiscardingTaskGroup { group in
+        for _ in 0..<writers {
+            group.addTask {
+                let writes = elementCount / writers
+                for i in 0..<writes {
+                    while !queue.enqueue(Object(i)) { await Task.yield() }
                 }
             }
         }
-    } else if singleWriter && !singleReader {
-        DispatchQueue.concurrentPerform(iterations: 8) { i in
-            if i == 0 {
-                for j in 0..<10000 * 7 {
-                    while !queue.enqueue(Object(j)){}
-                }
-            } else {
-                for _ in 0..<10000 {
-                    while true {
-                        if queue.dequeue() != nil {
-                            break
-                        }
-                    }
-                }
-            }
-        }
-    } else if singleWriter && singleReader {
-        DispatchQueue.concurrentPerform(iterations: 2) { i in
-            if i == 0 {
-                for j in 0..<10000 * 7 {
-                    while !queue.enqueue(Object(j)){}
-                }
-            } else {
-                for _ in 0..<10000 * 7 {
-                    while true {
-                        if queue.dequeue() != nil {
-                            break
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        DispatchQueue.concurrentPerform(iterations: 8) { i in
-            if i % 2 == 0 {
-                for i in 0..<10000 {
-                    _ = queue.enqueue(Object(i))
-                }
-            } else {
-                for _ in 0..<10000 {
-                    while true {
-                        if queue.dequeue() != nil {
-                            break
-                        }
-                    }
+        for _ in 0..<readers {
+            group.addTask {
+                let reads = elementCount / readers
+                for _ in 0..<reads {
+                    while queue.dequeue() == nil { await Task.yield() }
                 }
             }
         }
     }
+    XCTAssertEqual(Object.count.load(ordering: .relaxed), 0)
 }
 
-internal func test<T: ConcurrentQueue>(queue: T, writers: Int, readers: Int, elements: Int = 10_000) where T.Element == (item: Int, thread: Int) {
-    let threadCount = writers + readers
-    let countLock = Lock()
-    var count = 0
-    var done = writers
-    var accumulatedCount = 0
-    DispatchQueue.concurrentPerform(iterations: threadCount) { i in
-        if i < writers {
-            for index in 0..<elements {
-                let element = (item: index, thread: i)
-                while !queue.enqueue(element) {}
-                countLock.lock()
-                accumulatedCount &+= index
-                countLock.unlock()
-            }
-            countLock.lock()
-            done &-= 1
-            countLock.unlock()
-        }
-        if i >= writers {
-            var nextItem = 0
-            var writerDictionary: [Int: Int] = [:]
-            for i in 0..<writers {
-                writerDictionary[i] = -1
-            }
-            while true {
-                while let element = queue.dequeue() {
-                    countLock.lock()
-                    count &+= element.item
-                    countLock.unlock()
-                    if writers == 1 && readers == 1 {
-                        XCTAssertEqual(nextItem, element.item)
-                        nextItem += 1
-                    } else {
-                        XCTAssertGreaterThan(element.item, writerDictionary[element.thread]!)
-                        writerDictionary[element.thread] = element.item
+internal func test<T: ConcurrentQueue>(queue: T, writers: Int, readers: Int, elements: Int = 10_000) async where T.Element == (item: Int, task: Int) {
+    let count = Atomic<Int>(0)
+    let done = Atomic<Int>(writers)
+    let accumulatedCount = Atomic<Int>(0)
+    await withDiscardingTaskGroup { group in 
+        // Writers
+        for i in 0..<writers {
+            group.addTask {
+                for index in 0..<elements {
+                    let element = (item: index, task: i)
+                    while !queue.enqueue(element) {
+                        await Task.yield()
                     }
-                    continue
+                    accumulatedCount.add(index, ordering: .relaxed)
                 }
-                countLock.lock()
-                let isDone = done <= 0
-                countLock.unlock()
-                if isDone { break }
+                done.subtract(1, ordering: .relaxed)
             }
-            queue.dequeueAll { (element) in
-                countLock.lock()
-                count &+= element.item
-                countLock.unlock()
+        }
+        // Readers
+        for _ in 0..<readers {
+            group.addTask {
+                var nextItem = 0
+                var writerDictionary: [Int: Int] = [:]
+                for i in 0..<writers {
+                    writerDictionary[i] = -1
+                }
+                while true {
+                    while let element = queue.dequeue() {
+                        count.add(element.item, ordering: .relaxed)
+                        if writers == 1 && readers == 1 {
+                            XCTAssertEqual(nextItem, element.item)
+                            nextItem += 1
+                        } else {
+                            XCTAssertGreaterThan(element.item, writerDictionary[element.task]!)
+                            writerDictionary[element.task] = element.item
+                        }
+                    }
+                    await Task.yield()
+                    let isDone = done.load(ordering: .relaxed) <= 0
+                    if isDone { break }
+                }
+                queue.dequeueAll { (element) in
+                    count.add(element.item, ordering: .relaxed)
+                }
             }
         }
     }
-    let finalCount = count
-    let finalAccumulated = accumulatedCount
+    let finalCount = count.load(ordering: .relaxed)
+    let finalAccumulated = accumulatedCount.load(ordering: .relaxed)
     XCTAssertEqual(finalCount, finalAccumulated, "The queue wasn't deterministic. Queue: \(queue)")
     XCTAssertNil(queue.dequeue(), "Queue wasn't empty when it should be. Queue: \(queue)")
 }
 
-internal func test<T: ConcurrentStack>(stack: T, singleWriter: Bool, singleReader: Bool) where T.Element == Object {
-    if singleReader && !singleWriter {
-        DispatchQueue.concurrentPerform(iterations: 8) { i in
-            if i == 0 {
-                for _ in 0..<7 * 10000 {
-                    while true {
-                        if stack.pop() != nil {
-                            break
-                        }
-                    }
-                }
-            } else {
-                for j in 0..<10000 {
-                    while !stack.push(Object(j)){}
+internal func test<T: ConcurrentStack>(stack: T, singleWriter: Bool, singleReader: Bool) async where T.Element == Object {
+    let writers = singleWriter ? 1 : 8
+    let readers = singleReader ? 1 : 8
+    let elementCount = 80_000
+    await withDiscardingTaskGroup { group in
+        for _ in 0..<writers {
+            group.addTask {
+                let writes = elementCount / writers
+                for i in 0..<writes {
+                    while !stack.push(Object(i)) { await Task.yield() }
                 }
             }
         }
-    } else if singleWriter && !singleReader {
-        DispatchQueue.concurrentPerform(iterations: 8) { i in
-            if i == 0 {
-                for j in 0..<10000 * 7 {
-                    while !stack.push(Object(j)){}
-                }
-            } else {
-                for _ in 0..<10000 {
-                    while true {
-                        if stack.pop() != nil {
-                            break
-                        }
-                    }
-                }
-            }
-        }
-    } else if singleWriter && singleReader {
-        DispatchQueue.concurrentPerform(iterations: 2) { i in
-            if i == 0 {
-                for j in 0..<10000 * 7 {
-                    while !stack.push(Object(j)){}
-                }
-            } else {
-                for _ in 0..<10000 * 7 {
-                    while true {
-                        if stack.pop() != nil {
-                            break
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        DispatchQueue.concurrentPerform(iterations: 8) { i in
-            if i % 2 == 0 {
-                for i in 0..<10000 {
-                    _ = stack.push(Object(i))
-                }
-            } else {
-                for _ in 0..<10000 {
-                    while true {
-                        if stack.pop() != nil {
-                            break
-                        }
-                    }
+        for _ in 0..<readers {
+            group.addTask {
+                let reads = elementCount / readers
+                for _ in 0..<reads {
+                    while stack.pop() == nil { await Task.yield() }
                 }
             }
         }
     }
+    XCTAssertEqual(Object.count.load(ordering: .relaxed), 0)
 }
 
-internal func test<T: ConcurrentStack>(stack: T, writers: Int, readers: Int, elements: Int = 10_000) where T.Element == (item: Int, thread: Int) {
-    let threadCount = writers + readers
-    let countLock = Lock()
-    var count = 0
-    var done = writers
-    var accumulatedCount = 0
-    DispatchQueue.concurrentPerform(iterations: threadCount) { i in
-        if i < writers {
-            for index in 0..<elements {
-                let element = (item: index, thread: i)
-                while !stack.push(element) {}
-                countLock.lock()
-                accumulatedCount &+= index
-                countLock.unlock()
-            }
-            countLock.lock()
-            done &-= 1
-            countLock.unlock()
-        }
-        if i >= writers {
-            while true {
-                while let element = stack.pop() {
-                    countLock.lock()
-                    count &+= element.item
-                    countLock.unlock()
-                    continue
+internal func test<T: ConcurrentStack>(stack: T, writers: Int, readers: Int, elements: Int = 10_000) async where T.Element == (item: Int, task: Int) {
+    let count = Atomic<Int>(0)
+    let done = Atomic<Int>(writers)
+    let accumulatedCount = Atomic<Int>(0)
+    await withDiscardingTaskGroup { group in
+        for i in 0..<writers {
+            group.addTask {
+                for index in 0..<elements {
+                    let element = (item: index, task: i)
+                    while !stack.push(element) {
+                        await Task.yield()
+                    }
+                    accumulatedCount.add(index, ordering: .relaxed)
                 }
-                countLock.lock()
-                let isDone = done <= 0
-                countLock.unlock()
-                if isDone { break }
+                done.subtract(1, ordering: .relaxed)
             }
-            stack.popAll { (element) in
-                countLock.lock()
-                count &+= element.item
-                countLock.unlock()
+        }
+        for _ in 0..<readers {
+            group.addTask {
+                while true {
+                    while let element = stack.pop() {
+                        count.add(element.item, ordering: .relaxed)
+                    }
+                    let isDone = done.load(ordering: .relaxed) <= 0
+                    if isDone { break }
+                    await Task.yield()
+                }
+                stack.popAll { (element) in
+                    count.add(element.item, ordering: .relaxed)
+                }
             }
         }
     }
-    let finalCount = count
-    let finalAccumulated = accumulatedCount
+    let finalCount = count.load(ordering: .relaxed)
+    let finalAccumulated = accumulatedCount.load(ordering: .relaxed)
     XCTAssertEqual(finalCount, finalAccumulated, "The stack wasn't deterministic. Stack: \(stack)")
     XCTAssertNil(stack.pop(), "Stack wasn't empty when it should be. Stack: \(stack)")
 }
 
-internal func test<T: ConcurrentDeque>(queue: T, writers: Int, readers: Int, elements: Int = 10_000) where T.Element == (item: Int, thread: Int) {
-    let threadCount = writers + readers
-    let countLock = Lock()
-    var count = 0
-    var done = writers
-    var accumulatedCount = 0
-    DispatchQueue.concurrentPerform(iterations: threadCount) { i in
-        if i < writers {
-            for index in 0..<elements {
-                let element = (item: index, thread: i)
-                queue.append(element)
-                countLock.lock()
-                accumulatedCount &+= index
-                countLock.unlock()
-            }
-            countLock.lock()
-            done &-= 1
-            countLock.unlock()
-        }
-        if i >= writers {
-            var nextItem = 0
-            var writerDictionary: [Int: Int] = [:]
-            for i in 0..<writers {
-                writerDictionary[i] = -1
-            }
-            while true {
-                countLock.lock()
-                let isDone = done <= 0
-                countLock.unlock()
-                if isDone { break }
-                if let element = queue.popFirst() {
-                    countLock.lock()
-                    count &+= element.item
-                    countLock.unlock()
-                    if writers == 1 && readers == 1 {
-                        XCTAssertEqual(nextItem, element.item)
-                        nextItem += 1
-                    } else {
-                        XCTAssertGreaterThan(element.item, writerDictionary[element.thread]!)
-                        writerDictionary[element.thread] = element.item
-                    }
-                    continue
+internal func test<T: ConcurrentDeque>(queue: T, writers: Int, readers: Int, elements: Int = 10_000) async where T.Element == (item: Int, task: Int) {
+    let count = Atomic<Int>(0)
+    let done = Atomic<Int>(writers)
+    let accumulatedCount = Atomic<Int>(0)
+    await withDiscardingTaskGroup { group in
+        for i in 0..<writers {
+            group.addTask {
+                for index in 0..<elements {
+                    let element = (item: index, task: i)
+                    queue.append(element)
+                    accumulatedCount.add(index, ordering: .relaxed)
+                    if index % 1000 == 0 { await Task.yield() }
                 }
+                done.subtract(1, ordering: .relaxed)
             }
-            queue.removeAll { element in
-                countLock.lock()
-                count &+= element.item
-                countLock.unlock()
-                return true
+        }
+        for _ in 0..<readers {
+            group.addTask {
+                var nextItem = 0
+                var writerDictionary: [Int: Int] = [:]
+                for i in 0..<writers {
+                    writerDictionary[i] = -1
+                }
+                while true {
+                    let isDone = done.load(ordering: .relaxed) <= 0
+                    if isDone { break }
+
+                    if let element = queue.popFirst() {
+                        count.add(element.item, ordering: .relaxed)
+                        if writers == 1 && readers == 1 {
+                            XCTAssertEqual(nextItem, element.item)
+                            nextItem += 1
+                        } else {
+                            XCTAssertGreaterThan(element.item, writerDictionary[element.task]!)
+                            writerDictionary[element.task] = element.item
+                        }
+                    }
+                    await Task.yield()
+                }
+                queue.removeAll { element in
+                    count.add(element.item, ordering: .relaxed)
+                    return true
+                }
             }
         }
     }
-    let finalCount = count
-    let finalAccumulated = accumulatedCount
+    
+    let finalCount = count.load(ordering: .relaxed)
+    let finalAccumulated = accumulatedCount.load(ordering: .relaxed)
     XCTAssert(finalCount == finalAccumulated, "The queue wasn't deterministic")
     XCTAssertNil(queue.popFirst())
 }

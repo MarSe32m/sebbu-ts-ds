@@ -4,14 +4,14 @@
 //
 //  Created by Sebastian Toivonen on 6.12.2020.
 //
+import Synchronization
 
-//TODO: Implement shrinking when automaticResizing is enabled?
-public final class LockedBoundedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
+public final class LockedBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     @usableFromInline
-    internal let lock = Lock()
+    internal let lock = Mutex(())
     
     @usableFromInline
-    internal var buffer: UnsafeMutableBufferPointer<Element?>
+    internal var buffer: UnsafeMutableBufferPointer<Element>
     
     @usableFromInline
     internal var headIndex = 0
@@ -30,48 +30,45 @@ public final class LockedBoundedQueue<Element>: ConcurrentQueue, @unchecked Send
     }
     
     public var count: Int {
-        lock.withLock {
-            _count
-        }
+        lock.withLock { _ in _count }
     }
     
     @inlinable
     public var wasFull: Bool {
-        lock.withLock {
+        lock.withLock { _ in
             (tailIndex + 1) & self.mask == headIndex
         }
     }
     
     public init(size: Int) {
         buffer = UnsafeMutableBufferPointer.allocate(capacity: size.nextPowerOf2())
-        buffer.initialize(repeating: nil)
     }
     
     deinit {
-        buffer.baseAddress?.deinitialize(count: buffer.count)
+        while dequeue() != nil {}
         buffer.deallocate()
     }
     
     /// Enqueues an item at the end of the queue
     @discardableResult
-    public func enqueue(_ value: Element) -> Bool {
-        lock.lock(); defer { lock.unlock() }
+    public func enqueue(_ value: consuming Element) -> Element? {
+        lock._unsafeLock(); defer { lock._unsafeUnlock() }
         return _enqueue(value)
     }
     
     @inline(__always)
-    internal func _enqueue(_ value: Element) -> Bool {
+    internal func _enqueue(_ value: consuming Element) -> Element? {
         if (tailIndex + 1) & self.mask == headIndex {
-            return false
+            return value
         }
-        buffer[tailIndex] = value
+        buffer.initializeElement(at: tailIndex, to: value)
         tailIndex = (tailIndex + 1) & self.mask
-        return true
+        return nil
     }
     
     /// Dequeues the next element in the queue if there are any
     public func dequeue() -> Element? {
-        lock.lock(); defer { lock.unlock() }
+        lock._unsafeLock(); defer { lock._unsafeUnlock() }
         return _dequeue()
     }
     
@@ -79,31 +76,22 @@ public final class LockedBoundedQueue<Element>: ConcurrentQueue, @unchecked Send
     @usableFromInline
     internal func _dequeue() -> Element? {
         if headIndex == tailIndex { return nil }
-        defer {
-            buffer[headIndex] = nil
-            headIndex = (headIndex + 1) & self.mask
-        }
-        return buffer[headIndex]
+        let result = buffer.moveElement(from: headIndex)
+        headIndex = (headIndex + 1) & self.mask
+        return result
     }
     
     /// Dequeues all of the elements
     @inline(__always)
-    public func dequeueAll(_ closure: (Element) -> Void) {
+    public func dequeueAll(_ closure: (consuming Element) -> Void) {
         while let element = dequeue() {
             closure(element)
         }
-        //TODO: Maybe an option for this type of dequeueing?
-        /*
-        lock.lock(); defer { lock.unlock() }
-        while let element = _dequeue() {
-            closure(element)
-        }
-        */
     }
     
     /// Removes all the elements specified by the given predicate. This will aquire the lock for the whole duration of the removal.
-    public func removeAll(where shouldBeRemoved: (Element) throws -> Bool) rethrows {
-        lock.lock(); defer { lock.unlock() }
+    public func removeAll(where shouldBeRemoved: (borrowing Element) throws -> Bool) rethrows {
+        lock._unsafeLock(); defer { lock._unsafeUnlock() }
         let elementCount = _count
         if elementCount == 0 { return }
         for _ in 0..<elementCount {
@@ -112,31 +100,27 @@ public final class LockedBoundedQueue<Element>: ConcurrentQueue, @unchecked Send
             }
             if try !shouldBeRemoved(element) {
                 let enqueued = _enqueue(element)
-                assert(enqueued)
+                assert(enqueued != nil)
             }
         }
     }
     
-    /// Removes all the elements specified by the given predicate and returns the removed elements.
-    /// This will aquire the lock for the whole duration of the removal.
-    public func removeAll(where shouldBeRemoved: (Element) throws -> Bool) rethrows -> [Element] {
-        lock.lock(); defer { lock.unlock() }
+    /// Removes all the elements specified by the given predicate.
+    /// Returning nil means that the element will be removed.
+    /// Note: The underlying lock will be held for whole duration of the removal.
+    public func removeAll(where shouldBeRemoved: (consuming Element) throws -> Element?) rethrows {
+        lock._unsafeLock(); defer { lock._unsafeLock() }
         let elementCount = _count
-        if elementCount == 0 { return [] }
-        var result = [Element]()
-        result.reserveCapacity(elementCount / 4 > 1 ? elementCount / 4 : 2)
+        if elementCount == 0 { return }
         for _ in 0..<elementCount {
             guard let element = _dequeue() else {
                 fatalError("Failed to dequeue an item from a non empty queue?")
             }
-            if try !shouldBeRemoved(element) {
+            if let element = try shouldBeRemoved(element) {
                 let enqueued = _enqueue(element)
-                assert(enqueued)
-            } else {
-                result.append(element)
+                assert(enqueued != nil)
             }
         }
-        return result
     }
 }
 
@@ -153,3 +137,5 @@ extension LockedBoundedQueue: Sequence {
         Iterator(queue: self)
     }
 }
+
+extension LockedBoundedQueue: ConcurrentQueue {}

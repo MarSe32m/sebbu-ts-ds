@@ -15,7 +15,7 @@ public protocol ConcurrentStack {
     /// Pushes an item on top of the stack
     /// - returns Boolean value based on if the item was pushed successfully
     @inlinable
-    func push(_ value: Element) -> Bool
+    func push(_ value: consuming Element) -> Element?
     
     /// Pops an item from the top of the stack
     @inlinable
@@ -23,10 +23,12 @@ public protocol ConcurrentStack {
     
     /// Pop all of the items from the stack
     @inline(__always)
-    func popAll(_ closure: (Element) -> Void)
+    func popAll(_ closure: (consuming Element) -> Void)
 }
 
 public extension ConcurrentStack {
+    func push(_ value: consuming Element) -> Bool { push(value) != nil }
+
     //TODO: Maybe remove default implementation
     var count: Int { -1 }
     

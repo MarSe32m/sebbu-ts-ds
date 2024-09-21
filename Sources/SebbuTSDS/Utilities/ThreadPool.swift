@@ -50,7 +50,8 @@ final class Queue {
     
     @inlinable
     func enqueue(_ work: Work) {
-        workQueue.enqueue(work)
+        let enqueued: Bool = workQueue.enqueue(work)
+        assert(enqueued)
     }
 }
 
@@ -151,7 +152,8 @@ public final class ThreadPool {
     @inlinable
     public final func run(after nanoseconds: UInt64, _ block: @escaping () -> ()) {
         let deadline = DispatchTime.now().uptimeNanoseconds + nanoseconds
-        timedWorkQueue.enqueue(TimedWork(block, deadline))
+        let enqueued: Bool = timedWorkQueue.enqueue(TimedWork(block, deadline))
+        assert(enqueued)
         semaphore.signal()
     }
 

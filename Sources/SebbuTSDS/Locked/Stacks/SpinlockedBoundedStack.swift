@@ -6,12 +6,12 @@
 //
 
 /// An bounded spinlocked stack
-public final class SpinlockedBoundedStack<Element>: @unchecked Sendable, ConcurrentStack {
+public final class SpinlockedBoundedStack<Element: ~Copyable>: @unchecked Sendable {
     @usableFromInline
     internal let lock = Spinlock()
     
     @usableFromInline
-    internal var buffer: UnsafeMutableBufferPointer<Element?>
+    internal var buffer: UnsafeMutableBufferPointer<Element>
     
     @usableFromInline
     internal var index: Int = -1
@@ -24,75 +24,71 @@ public final class SpinlockedBoundedStack<Element>: @unchecked Sendable, Concurr
     }
     
     public init(capacity: Int) {
-        assert(capacity > 0, "A bounded stack must have some room to push elements...")
+        assert(capacity > 0, "The stack must have some capacity to push elements...")
         buffer = UnsafeMutableBufferPointer.allocate(capacity: capacity)
-        buffer.initialize(repeating: nil)
     }
     
     deinit {
-        buffer.baseAddress?.deinitialize(count: buffer.count)
+        while pop() != nil {}
         buffer.deallocate()
     }
     
     @inlinable
     @discardableResult
-    public final func push(_ value: Element) -> Bool {
-        lock.withLock {
-            _push(value)
-        }
+    public final func push(_ value: consuming Element) -> Element? {
+        lock.lock(); defer { lock.unlock() }
+        return _push(value)
     }
     
     @inlinable
     @inline(__always)
-    internal final func _push(_ value: Element) -> Bool {
-        if index == buffer.count - 1 { return false }
+    internal final func _push(_ value: consuming Element) -> Element? {
+        if index == buffer.count - 1 { return value }
         index += 1
-        buffer[index] = value
-        return true
+        buffer.initializeElement(at: index, to: value)
+        return nil
     }
     
     @inlinable
     public final func pop() -> Element? {
-        lock.withLock {
-            _pop()
-        }
+        lock.lock(); defer { lock.unlock() }
+        return _pop()
     }
     
     @inlinable
     @inline(__always)
     internal final func _pop() -> Element? {
         if index < 0 { return nil }
-        let result = buffer[index]
-        buffer[index] = nil
+        let result = buffer.moveElement(from: index)
         index -= 1
         return result
     }
     
     @inline(__always)
-    public final func popAll(_ closure: (Element) -> Void) {
+    public final func popAll(_ closure: (consuming Element) -> Void) {
         while let element = pop() {
             closure(element)
         }
     }
-    
-    /// Empties the stack and resizes the stack to a new size.
-    /// Optionally one can pass a closure to inspect / transform the removed nodes, such
-    /// as re-push them.
+
     @inlinable
-    public func resize(to newSize: Int, _ block: ((Element) -> Void)? = nil) {
-        assert(newSize > 0)
-        lock.lock();
-        let oldBuffer = buffer
-        buffer  = UnsafeMutableBufferPointer<Element?>.allocate(capacity: newSize)
-        buffer.initialize(repeating: nil)
-        index = 0
-        lock.unlock()
-        guard let block = block else { return }
-        for i in 0..<oldBuffer.count {
-            if let element = oldBuffer[i] {
-                block(element)
-            } else { return }
+    public func reserveCapacity(_ capacity: Int) {
+        lock.lock(); defer { lock.unlock() }
+        if index + 1 >= capacity { return }
+        _resize(capacity) 
+    }
+
+    @inlinable
+    internal func _resize(_ newSize: Int) {
+        let newBuffer = UnsafeMutableBufferPointer<Element>.allocate(capacity: newSize)
+        var newIndex = -1
+        for i in 0..<index + 1 {
+            newBuffer.initializeElement(at: i, to: buffer.moveElement(from: i))
+            newIndex += 1
         }
+        self.index = newIndex
+        self.buffer.deallocate()
+        self.buffer = newBuffer
     }
 }
 
@@ -109,3 +105,5 @@ extension SpinlockedBoundedStack: Sequence {
         Iterator(stack: self)
     }
 }
+
+extension SpinlockedBoundedStack: ConcurrentStack {}

@@ -6,20 +6,21 @@
 //
 
 import HeapModule
+import Synchronization
 
 public final class LockedPriorityQueue<Element>: @unchecked Sendable where Element: Comparable {
     @usableFromInline
     internal var _heap: Heap<Element>
     
     @usableFromInline
-    internal let lock = Lock()
+    internal let lock = Mutex(())
     
     /// A Boolean value indicating whether or not the priority queue is empty.
     ///
     /// - Complexity: O(1)
     @inlinable @inline(__always)
     public var isEmpty: Bool {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.isEmpty
         }
     }
@@ -29,7 +30,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     /// - Complexity: O(1)
     @inlinable @inline(__always)
     public var count: Int {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.count
         }
     }
@@ -43,7 +44,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     /// - Complexity: O(1)
     @inlinable
     public var unordered: [Element] {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.unordered
         }
     }
@@ -66,7 +67,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     /// - Complexity: O(log(`count`)) element comparisons
     @inlinable
     public func insert(_ element: Element) {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.insert(element)
         }
     }
@@ -76,7 +77,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     /// - Complexity: O(1)
     @inlinable
     public func min() -> Element? {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.min
         }
     }
@@ -86,7 +87,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     /// - Complexity: O(1)
     @inlinable
     public func max() -> Element? {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.max
         }
     }
@@ -96,7 +97,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     /// - Complexity: O(log(`count`)) element comparisons
     @inlinable
     public func popMin() -> Element? {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.popMin()
         }
     }
@@ -106,7 +107,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     /// - Complexity: O(log(`count`)) element comparisons
     @inlinable
     public func popMax() -> Element? {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.popMax()
         }
     }
@@ -144,7 +145,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     @inlinable
     @discardableResult
     public func replaceMin(with replacement: Element) -> Element {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.replaceMin(with: replacement)
         }
     }
@@ -162,7 +163,7 @@ public final class LockedPriorityQueue<Element>: @unchecked Sendable where Eleme
     @inlinable
     @discardableResult
     public func replaceMax(with replacement: Element) -> Element {
-        lock.withLock {
+        lock.withLock { _ in
             _heap.replaceMax(with: replacement)
         }
     }

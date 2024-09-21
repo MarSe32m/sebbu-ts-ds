@@ -4,112 +4,89 @@
 //
 //  Created by Sebastian Toivonen on 28.12.2021.
 //
-#if canImport(Atomics)
-import Atomics
-#endif
+
 import XCTest
 import SebbuTSDS
 import Foundation
+import Synchronization
 
 final class SebbuTSDSLockTests: XCTestCase {
-    #if canImport(Atomics)
-    func testSpinlockCounting() {
+    func testSpinlockCounting() async {
         let spinlock = Spinlock()
-        var counter = 1_000_000 * 11
-        let atomicCounter = ManagedAtomic<Int>(1_000_000 * 11)
+        nonisolated(unsafe) var counter = 1_000_000 * 11
+        let atomicCounter = Atomic<Int>(1_000_000 * 11)
         for _ in 0..<11 {
-            Thread.detachNewThread {
+            Task.detached {
                 for _ in 0..<1_000_000 {
                     spinlock.withLock {
                         counter -= 1
                     }
-                    atomicCounter.wrappingDecrement(ordering: .relaxed)
+                    atomicCounter.subtract(1, ordering: .relaxed)
                 }
             }
         }
-        while atomicCounter.load(ordering: .relaxed) > 0 {}
+        while atomicCounter.load(ordering: .relaxed) > 0 { await Task.yield() }
         spinlock.withLock {
             XCTAssert(counter == 0)
         }
     }
     
-    func testLockCounting() {
-        let lock = Lock()
-        var counter = 1_000_000 * 11
-        let atomicCounter = ManagedAtomic<Int>(1_000_000 * 11)
-        for _ in 0..<11 {
-            Thread.detachNewThread {
-                for _ in 0..<1_000_000 {
-                    lock.withLock {
-                        counter -= 1
-                    }
-                    atomicCounter.wrappingDecrement(ordering: .relaxed)
-                }
-            }
-        }
-        while atomicCounter.load(ordering: .relaxed) > 0 {}
-        lock.withLock {
-            XCTAssert(counter == 0)
-        }
-    }
-    
-    func testNSLockCounting() {
+    func testNSLockCounting() async {
         let lock = NSLock()
-        var counter = 1_000_000 * 11
-        let atomicCounter = ManagedAtomic<Int>(1_000_000 * 11)
+        nonisolated(unsafe) var counter = 1_000_000 * 11
+        let atomicCounter = Atomic<Int>(1_000_000 * 11)
         for _ in 0..<11 {
-            Thread.detachNewThread {
+            Task.detached {
                 for _ in 0..<1_000_000 {
                     lock.withLock {
                         counter -= 1
                     }
-                    atomicCounter.wrappingDecrement(ordering: .relaxed)
+                    atomicCounter.subtract(1, ordering: .relaxed)
                 }
             }
         }
-        while atomicCounter.load(ordering: .relaxed) > 0 {}
+        while atomicCounter.load(ordering: .relaxed) > 0 { await Task.yield() }
         lock.withLock {
             XCTAssert(counter == 0)
         }
     }
-    #endif
     
     func testTryLocking() {
         let spinlock = Spinlock()
-        let lock = Lock()
+        let lock = Mutex(())
         let nsLock = NSLock()
         
         XCTAssertTrue(spinlock.tryLock())
-        XCTAssertTrue(lock.tryLock())
+        XCTAssertTrue(lock._unsafeTryLock())
         XCTAssertTrue(nsLock.try())
         
         spinlock.unlock()
-        lock.unlock()
+        lock._unsafeUnlock()
         nsLock.unlock()
         
         Thread.detachNewThread {
             spinlock.lock()
-            lock.lock()
+            lock._unsafeLock()
             nsLock.lock()
             Thread.sleep(forTimeInterval: 3)
             spinlock.unlock()
-            lock.unlock()
+            lock._unsafeUnlock()
             nsLock.unlock()
         }
         
         Thread.sleep(forTimeInterval: 1)
         XCTAssertFalse(spinlock.tryLock())
-        XCTAssertFalse(lock.tryLock())
+        XCTAssertFalse(lock._unsafeTryLock())
         XCTAssertFalse(nsLock.try())
         
         Thread.sleep(forTimeInterval: 5)
         
         XCTAssertTrue(spinlock.tryLock())
-        XCTAssertTrue(lock.tryLock())
+        XCTAssertTrue(lock._unsafeTryLock())
         XCTAssertTrue(nsLock.try())
         
         spinlock.unlock()
-        lock.unlock()
+        lock._unsafeUnlock()
         nsLock.unlock()
     }
 }

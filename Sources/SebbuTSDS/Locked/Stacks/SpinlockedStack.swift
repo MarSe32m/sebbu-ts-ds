@@ -6,12 +6,12 @@
 //
 
 /// An unbounded locked stack
-public final class SpinlockedStack<Element>: @unchecked Sendable, ConcurrentStack {
+public final class SpinlockedStack<Element: ~Copyable>: @unchecked Sendable {
     @usableFromInline
     internal let lock = Spinlock()
     
     @usableFromInline
-    internal var buffer: UnsafeMutableBufferPointer<Element?>
+    internal var buffer: UnsafeMutableBufferPointer<Element>
     
     @usableFromInline
     internal var index: Int = -1
@@ -25,50 +25,45 @@ public final class SpinlockedStack<Element>: @unchecked Sendable, ConcurrentStac
     
     public init() {
         buffer = UnsafeMutableBufferPointer.allocate(capacity: 16)
-        buffer.initialize(repeating: nil)
     }
     
     deinit {
-        buffer.baseAddress?.deinitialize(count: buffer.count)
+        while pop() != nil {}
         buffer.deallocate()
     }
     
     @inlinable
-    @discardableResult
-    public final func push(_ value: Element) -> Bool {
-        lock.withLock {
-            _push(value)
-        }
+    public final func push(_ value: consuming Element) -> Element? {
+        lock.lock(); defer { lock.unlock() }
+        _push(value)
+        return nil
     }
     
     @inlinable
     @inline(__always)
-    internal final func _push(_ value: Element) -> Bool {
+    internal final func _push(_ value: consuming Element) {
         if index == buffer.count - 1 { _grow() }
         index += 1
-        buffer[index] = value
-        return true
+        buffer.initializeElement(at: index, to: value)
     }
     
     @inlinable
     public final func pop() -> Element? {
-        lock.withLock {
-            _pop()
-        }
+        lock.lock(); defer { lock.unlock() }
+        return _pop()
     }
     
     @inlinable
     @inline(__always)
     internal final func _pop() -> Element? {
         if index < 0 { return nil }
-        let result = buffer[index]
-        buffer[index] = nil
+        let result = buffer.moveElement(from: index)
         index -= 1
         return result
     }
     
     @inline(__always)
-    public final func popAll(_ closure: (Element) -> Void) {
+    public final func popAll(_ closure: (consuming Element) -> Void) {
         while let element = pop() {
             closure(element)
         }
@@ -78,38 +73,29 @@ public final class SpinlockedStack<Element>: @unchecked Sendable, ConcurrentStac
     /// Optionally one can pass a closure to inspect / transform the removed nodes, such
     /// as re-push them.
     @inlinable
-    public func resize(to newSize: Int, _ block: ((Element) -> Void)? = nil) {
-        assert(newSize > 0)
-        lock.lock();
-        let oldBuffer = buffer
-        buffer  = UnsafeMutableBufferPointer<Element?>.allocate(capacity: newSize)
-        buffer.initialize(repeating: nil)
-        index = 0
-        lock.unlock()
-        guard let block = block else { return }
-        for i in 0..<oldBuffer.count {
-            if let element = oldBuffer[i] {
-                block(element)
-            } else { return }
+    public func reserveCapacity(_ capacity: Int) {
+        lock.withLock { 
+            if index + 1 >= capacity { return }
+            _resize(capacity)
         }
-        oldBuffer.baseAddress?.deinitialize(count: oldBuffer.count)
-        oldBuffer.deallocate()
     }
     
     /// Grows the capacity to 1.5 times the old capacity
     @inlinable
     internal func _grow() {
-        let nextSize = nextSize(buffer.count)
-        assert(nextSize > buffer.count)
-        
-        let oldBuffer = buffer
-        buffer = UnsafeMutableBufferPointer<Element?>.allocate(capacity: nextSize)
-        buffer.initialize(repeating: nil)
-        for index in 0..<oldBuffer.count {
-            buffer[index] = oldBuffer[index]
+        let newSize = nextSize(buffer.count)
+        _resize(newSize)
+    }
+
+    @inlinable
+    internal func _resize(_ newSize: Int) {
+        assert(newSize >= buffer.count)
+        var newBuffer = UnsafeMutableBufferPointer<Element>.allocate(capacity: newSize)
+        for index in 0..<buffer.count {
+            newBuffer.initializeElement(at: index, to: buffer.moveElement(from: index))
         }
-        oldBuffer.baseAddress?.deinitialize(count: oldBuffer.count)
-        oldBuffer.deallocate()
+        buffer.deallocate()
+        swap(&buffer, &newBuffer)
     }
 
     @inlinable
@@ -132,3 +118,5 @@ extension SpinlockedStack: Sequence {
         Iterator(stack: self)
     }
 }
+
+extension SpinlockedStack: ConcurrentStack {}

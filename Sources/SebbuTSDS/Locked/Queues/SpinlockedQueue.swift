@@ -8,50 +8,110 @@
 import DequeModule
 
 /// An unbounded locked queue
-public final class SpinlockedQueue<Element>: ConcurrentQueue, @unchecked Sendable {
+public final class SpinlockedQueue<Element: ~Copyable>: @unchecked Sendable {
     @usableFromInline
     internal let lock = Spinlock()
     
     @usableFromInline
-    internal var _storage: Deque<Element> = Deque()
-    
+    internal var buffer: UnsafeMutableBufferPointer<Element>
+
+    @usableFromInline
+    internal var readIndex: Int = 0
+
+    @usableFromInline
+    internal var writeIndex: Int = 0
+
     @inlinable
     public var count: Int {
-        lock.withLock {
-            _storage.count
-        }
+        lock.withLock { _count }
     }
     
     @inlinable
-    public var wasFull: Bool { false }
-    
-    public init(cacheSize: Int = 128) {
-        _storage.reserveCapacity(cacheSize)
+    internal var _count: Int {
+        readIndex <= writeIndex ? writeIndex - readIndex : buffer.count - readIndex + writeIndex
     }
-    
+
+    public var wasFull: Bool {
+        false       
+    }
+
+
+    public init() {
+        buffer = .allocate(capacity: 16)
+    }
+
+    deinit {
+        while dequeue() != nil {}
+        buffer.deallocate()
+    }
+
     /// Enqueues an item at the end of the queue
-    @discardableResult
-    public func enqueue(_ value: Element) -> Bool {
-        lock.withLockVoid {
-            _storage.append(value)
-        }
-        return true
+    @inline(__always)
+    public func enqueue(_ value: consuming Element) -> Element? {
+        lock.lock(); defer { lock.unlock() }
+        _enqueue(value)
+        return nil
     }
     
+    @inline(__always)
+    @inlinable
+    internal func _enqueue(_ value: consuming Element) {
+        if (writeIndex + 1) % buffer.count == readIndex { _grow() }
+        buffer.initializeElement(at: writeIndex, to: value)
+        //TODO: Is this modulo a noticable performance penalty?
+        writeIndex = (writeIndex + 1) % buffer.count
+    }
+
     /// Dequeues the next element in the queue if there are any
+    @inline(__always)
     public func dequeue() -> Element? {
-        lock.lock()
-        let result = _storage.popFirst()
-        lock.unlock()
-        return result
+        lock.lock(); defer { lock.unlock() }
+        return _dequeue()
     }
     
+    @inline(__always)
+    @inlinable
+    internal func _dequeue() -> Element? {
+        if readIndex == writeIndex { return nil }
+        let element = buffer.moveElement(from: readIndex)
+        readIndex = (readIndex + 1) % buffer.count
+        return element
+    }
+
     /// Dequeues all of the elements
     @inline(__always)
-    public func dequeueAll(_ closure: (Element) -> Void) {
+    public func dequeueAll(_ closure: (consuming Element) -> Void) {
         while let element = dequeue() {
             closure(element)
         }
+    }
+    
+    @inlinable
+    public func reserveCapacity(_ capacity: Int) {
+        lock.lock(); defer { lock.unlock() }
+        if _count >= capacity { return }
+        _resize(capacity) 
+    }
+
+    @inline(__always)
+    @inlinable
+    internal func _grow() {
+        let newSize = Int(Double(buffer.count) * 1.618)
+        _resize(newSize)
+    }
+
+    @inlinable
+    internal func _resize(_ newSize: Int) {
+        let newBuffer = UnsafeMutableBufferPointer<Element>.allocate(capacity: newSize)
+        var newWriteIndex = 0
+        while let element = _dequeue() {
+            newBuffer.initializeElement(at: newWriteIndex, to: element)
+            newWriteIndex += 1
+        }
+        self.writeIndex = newWriteIndex
+        self.readIndex = 0
+        self.buffer.deallocate()
+        self.buffer = newBuffer
     }
 }
 
@@ -69,3 +129,5 @@ extension SpinlockedQueue: Sequence {
         Iterator(queue: self)
     }
 }
+
+extension SpinlockedQueue: ConcurrentQueue {}

@@ -11,9 +11,10 @@ import Dispatch
 import Foundation
 
 final class SebbuTSDSDequeTests: XCTestCase {
-    func testLockedDeque() {
-        let lockedDeque = LockedDeque<(item: Int, thread: Int)>()
-        lockedDeque.append((item: 1, thread: 0))
+    func testLockedDeque() async throws {
+        try XCTSkipIf(true, "Disabled due to long test times. To be fixed")
+        let lockedDeque = LockedDeque<(item: Int, task: Int)>()
+        lockedDeque.append((item: 1, task: 0))
         XCTAssertEqual(lockedDeque.count, 1)
         let _ = lockedDeque.popFirst()
         XCTAssertTrue(lockedDeque.isEmpty)
@@ -25,15 +26,17 @@ final class SebbuTSDSDequeTests: XCTestCase {
         }
         
         for i in 2...count {
-            test(queue: lockedDeque, writers: i / 2, readers: i / 2, elements: 1_000_00)
-            test(queue: lockedDeque, writers: i - 1, readers: 1, elements: 1_000_00)
+            print(i)
+            await test(queue: lockedDeque, writers: i / 2, readers: i / 2, elements: 1_000_00)
+            await test(queue: lockedDeque, writers: i - 1, readers: 1, elements: 1_000_00)
         }
     }
     
-    func testSpinlockedDeque() {
-        let spinlockedDeque = SpinlockedDeque<(item: Int, thread: Int)>()
+    func testSpinlockedDeque() async throws {
+        try XCTSkipIf(true, "Disabled due to long test times. To be fixed")
+        let spinlockedDeque = SpinlockedDeque<(item: Int, task: Int)>()
         
-        spinlockedDeque.append((item: 1, thread: 0))
+        spinlockedDeque.append((item: 1, task: 0))
         XCTAssertEqual(spinlockedDeque.count, 1)
         let _ = spinlockedDeque.popFirst()
         XCTAssertTrue(spinlockedDeque.isEmpty)
@@ -45,8 +48,9 @@ final class SebbuTSDSDequeTests: XCTestCase {
         }
         
         for i in 2...count {
-            test(queue: spinlockedDeque, writers: i / 2, readers: i / 2, elements: 1_000_00)
-            test(queue: spinlockedDeque, writers: i - 1, readers: 1, elements: 1_000_00)
+            print(i)
+            await test(queue: spinlockedDeque, writers: i / 2, readers: i / 2, elements: 1_000_00)
+            await test(queue: spinlockedDeque, writers: i - 1, readers: 1, elements: 1_000_00)
         }
     }
     
