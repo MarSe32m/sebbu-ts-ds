@@ -35,12 +35,12 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
     }
     
     func testLockedQueueCount() {
-        func remove<T: ConcurrentQueue>(_ queue: T) -> Int where T.Element == Int {
-            return queue.dequeue() != nil ? -1 : 0
+        func remove<T: ConcurrentQueue>(_ __queue: T) -> Int where T.Element == Int {
+            return __queue.dequeue() != nil ? -1 : 0
         }
         
-        func add<T: ConcurrentQueue>(_ queue: T) -> Int where T.Element == Int {
-            return queue.enqueue(Int.random(in: .min ... .max)) ? 1 : 0
+        func add<T: ConcurrentQueue>(_ __queue: T) -> Int where T.Element == Int {
+            return __queue.enqueue(Int.random(in: .min ... .max)) ? 1 : 0
         }
         
         let queue = LockedQueue<Int>()
@@ -58,7 +58,9 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
         elements = 0
         for _ in 1...24 {
             elements += 1
+            XCTAssertNil(_queue.enqueue(.random(in: 0...1)))
             let count = _queue.count
+            
             XCTAssertEqual(elements, count)
         }
         
@@ -97,12 +99,12 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
     }
     
     func testSpinlockedQueueCount() {
-        func remove<T: ConcurrentQueue>(_ queue: T) -> Int where T.Element == Int{
-            return queue.dequeue() != nil ? -1 : 0
+        func remove<T: ConcurrentQueue>(_ __queue: T) -> Int where T.Element == Int{
+            return __queue.dequeue() != nil ? -1 : 0
         }
         
-        func add<T: ConcurrentQueue>(_ queue: T) -> Int where T.Element == Int {
-            return queue.enqueue(Int.random(in: .min ... .max)) ? 1 : 0
+        func add<T: ConcurrentQueue>(_ __queue: T) -> Int where T.Element == Int {
+            return __queue.enqueue(Int.random(in: .min ... .max)) ? 1 : 0
         }
         
         let queue = SpinlockedQueue<Int>()
@@ -120,6 +122,7 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
         elements = 0
         for _ in 1...24 {
             elements += 1
+            XCTAssertNil(_queue.enqueue(.random(in: 0...1)))
             let count = _queue.count
             XCTAssertEqual(elements, count)
         }
