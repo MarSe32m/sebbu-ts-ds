@@ -36,5 +36,35 @@ final class MPMCBoundedQueueTests: XCTestCase {
             testDraining(queue)
         }
     }
+    
+    func testNonCopyableObject() async {
+        let queue = MPMCBoundedQueue<NonCopyableObject>(size: 128)
+        let writers = 8
+        let readers = 8
+        let elementCount = 80_000
+        await withDiscardingTaskGroup { group in
+            for _ in 0..<writers {
+                group.addTask {
+                    let writes = elementCount / writers
+                    for i in 0..<writes {
+                        var object = NonCopyableObject(i)
+                        while let newObject = queue.enqueue(object) {
+                            await Task.yield()
+                            object = consume newObject
+                        }
+                    }
+                }
+            }
+            for _ in 0..<readers {
+                group.addTask {
+                    let reads = elementCount / readers
+                    for _ in 0..<reads {
+                        while queue.dequeue() == nil { await Task.yield() }
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(NonCopyableObject.count.load(ordering: .relaxed), 0)
+    }
 }
 

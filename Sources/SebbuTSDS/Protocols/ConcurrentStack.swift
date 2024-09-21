@@ -27,7 +27,7 @@ public protocol ConcurrentStack {
 }
 
 public extension ConcurrentStack {
-    func push(_ value: consuming Element) -> Bool { push(value) != nil }
+    func push(_ value: consuming Element) -> Bool { push(value) == nil }
 
     //TODO: Maybe remove default implementation
     var count: Int { -1 }

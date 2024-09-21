@@ -11,8 +11,7 @@ import Dispatch
 import Foundation
 
 final class SebbuTSDSDequeTests: XCTestCase {
-    func testLockedDeque() async throws {
-        try XCTSkipIf(true, "Disabled due to long test times. To be fixed")
+    func testLockedDeque() async {
         let lockedDeque = LockedDeque<(item: Int, task: Int)>()
         lockedDeque.append((item: 1, task: 0))
         XCTAssertEqual(lockedDeque.count, 1)
@@ -26,14 +25,12 @@ final class SebbuTSDSDequeTests: XCTestCase {
         }
         
         for i in 2...count {
-            print(i)
             await test(queue: lockedDeque, writers: i / 2, readers: i / 2, elements: 1_000_00)
             await test(queue: lockedDeque, writers: i - 1, readers: 1, elements: 1_000_00)
         }
     }
     
-    func testSpinlockedDeque() async throws {
-        try XCTSkipIf(true, "Disabled due to long test times. To be fixed")
+    func testSpinlockedDeque() async {
         let spinlockedDeque = SpinlockedDeque<(item: Int, task: Int)>()
         
         spinlockedDeque.append((item: 1, task: 0))
@@ -48,7 +45,6 @@ final class SebbuTSDSDequeTests: XCTestCase {
         }
         
         for i in 2...count {
-            print(i)
             await test(queue: spinlockedDeque, writers: i / 2, readers: i / 2, elements: 1_000_00)
             await test(queue: spinlockedDeque, writers: i - 1, readers: 1, elements: 1_000_00)
         }

@@ -2,8 +2,7 @@ import XCTest
 import SebbuTSDS
 
 final class SebbuTSDSLockedQueueTests: XCTestCase {
-    func testLockedQueue() async throws {
-        try XCTSkipIf(true, "Disabled due to long test times. To be fixed")
+    func testLockedQueue() async {
         let lockedQueue = LockedQueue<(item: Int, task: Int)>()
         let lockedBounded = LockedBoundedQueue<(item: Int, task: Int)>(size: 1000)
         
@@ -57,11 +56,8 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
         
         let _queue = LockedBoundedQueue<Int>(size: 32)
         elements = 0
-        for i in 1...24 {
+        for _ in 1...24 {
             elements += 1
-            if !_queue.enqueue(i) {
-                print("WTF")
-            }
             let count = _queue.count
             XCTAssertEqual(elements, count)
         }
@@ -72,8 +68,7 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
         }
     }
     
-    func testSpinlockedQueue() async throws {
-        try XCTSkipIf(true, "Disabled due to long test times. To be fixed")
+    func testSpinlockedQueue() async {
         let spinlockedQueue = SpinlockedQueue<(item: Int, task: Int)>()
         let spinlockedBoundedQueue = SpinlockedBoundedQueue<(item: Int, task: Int)>(size: 1000)
         
@@ -123,11 +118,8 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
         
         let _queue = SpinlockedBoundedQueue<Int>(size: 32)
         elements = 0
-        for i in 1...24 {
+        for _ in 1...24 {
             elements += 1
-            if !_queue.enqueue(i) {
-                print("WTF")
-            }
             let count = _queue.count
             XCTAssertEqual(elements, count)
         }
@@ -136,6 +128,126 @@ final class SebbuTSDSLockedQueueTests: XCTestCase {
             elements += Bool.random() ? add(_queue) : remove(_queue)
             XCTAssertEqual(_queue.count, elements)
         }
+    }
+    
+    func testLockedQueueNonCopyableObject() async {
+        let queue = LockedQueue<NonCopyableObject>()
+        let writers = 8
+        let readers = 8
+        let elementCount = 80_000
+        await withDiscardingTaskGroup { group in
+            for _ in 0..<writers {
+                group.addTask {
+                    let writes = elementCount / writers
+                    for i in 0..<writes {
+                        var object = NonCopyableObject(i)
+                        while let newObject = queue.enqueue(object) {
+                            await Task.yield()
+                            object = consume newObject
+                        }
+                    }
+                }
+            }
+            for _ in 0..<readers {
+                group.addTask {
+                    let reads = elementCount / readers
+                    for _ in 0..<reads {
+                        while queue.dequeue() == nil { await Task.yield() }
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(NonCopyableObject.count.load(ordering: .relaxed), 0)
+    }
+    
+    func testLockedBoundedQueueNonCopyableObject() async {
+        let queue = LockedBoundedQueue<NonCopyableObject>(size: 128)
+        let writers = 8
+        let readers = 8
+        let elementCount = 80_000
+        await withDiscardingTaskGroup { group in
+            for _ in 0..<writers {
+                group.addTask {
+                    let writes = elementCount / writers
+                    for i in 0..<writes {
+                        var object = NonCopyableObject(i)
+                        while let newObject = queue.enqueue(object) {
+                            await Task.yield()
+                            object = consume newObject
+                        }
+                    }
+                }
+            }
+            for _ in 0..<readers {
+                group.addTask {
+                    let reads = elementCount / readers
+                    for _ in 0..<reads {
+                        while queue.dequeue() == nil { await Task.yield() }
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(NonCopyableObject.count.load(ordering: .relaxed), 0)
+    }
+    
+    func testSpinlockedQueueNonCopyableObject() async {
+        let queue = SpinlockedQueue<NonCopyableObject>()
+        let writers = 8
+        let readers = 8
+        let elementCount = 80_000
+        await withDiscardingTaskGroup { group in
+            for _ in 0..<writers {
+                group.addTask {
+                    let writes = elementCount / writers
+                    for i in 0..<writes {
+                        var object = NonCopyableObject(i)
+                        while let newObject = queue.enqueue(object) {
+                            await Task.yield()
+                            object = consume newObject
+                        }
+                    }
+                }
+            }
+            for _ in 0..<readers {
+                group.addTask {
+                    let reads = elementCount / readers
+                    for _ in 0..<reads {
+                        while queue.dequeue() == nil { await Task.yield() }
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(NonCopyableObject.count.load(ordering: .relaxed), 0)
+    }
+    
+    func testSpinlockedBoundedQueueNonCopyableObject() async {
+        let queue = SpinlockedBoundedQueue<NonCopyableObject>(size: 128)
+        let writers = 8
+        let readers = 8
+        let elementCount = 80_000
+        await withDiscardingTaskGroup { group in
+            for _ in 0..<writers {
+                group.addTask {
+                    let writes = elementCount / writers
+                    for i in 0..<writes {
+                        var object = NonCopyableObject(i)
+                        while let newObject = queue.enqueue(object) {
+                            await Task.yield()
+                            object = consume newObject
+                        }
+                    }
+                }
+            }
+            for _ in 0..<readers {
+                group.addTask {
+                    let reads = elementCount / readers
+                    for _ in 0..<reads {
+                        while queue.dequeue() == nil { await Task.yield() }
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(NonCopyableObject.count.load(ordering: .relaxed), 0)
     }
     
     func testQueueDraining() {

@@ -11,6 +11,27 @@ import Foundation
 import Synchronization
 
 final class SebbuTSDSLockTests: XCTestCase {
+    // Kinda unnecessary since this ought to be tested in the standard library but whatever...
+    func testLockCounting() async {
+        let lock = Mutex(())
+        nonisolated(unsafe) var counter = 1_000_000 * 11
+        let atomicCounter = Atomic<Int>(1_000_000 * 11)
+        for _ in 0..<11 {
+            Task.detached {
+                for _ in 0..<1_000_000 {
+                    lock.withLock { _ in
+                        counter -= 1
+                    }
+                    atomicCounter.subtract(1, ordering: .relaxed)
+                }
+            }
+        }
+        while atomicCounter.load(ordering: .relaxed) > 0 { await Task.yield() }
+        lock.withLock { _ in
+            XCTAssert(counter == 0)
+        }
+    }
+    
     func testSpinlockCounting() async {
         let spinlock = Spinlock()
         nonisolated(unsafe) var counter = 1_000_000 * 11

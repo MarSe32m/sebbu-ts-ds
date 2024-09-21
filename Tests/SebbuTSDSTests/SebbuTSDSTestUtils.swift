@@ -24,6 +24,20 @@ internal class Object {
     }
 }
 
+internal struct NonCopyableObject: ~Copyable {
+    let age: Int
+    static let count: Atomic<Int> = Atomic<Int>(0)
+    
+    init(_ age: Int) {
+        self.age = age
+        NonCopyableObject.count.add(1, ordering: .relaxed)
+    }
+    
+    deinit {
+        NonCopyableObject.count.subtract(1, ordering: .relaxed)
+    }
+}
+
 internal func test<T: ConcurrentQueue>(queue: T, singleWriter: Bool, singleReader: Bool) async where T.Element == Object {
     let writers = singleWriter ? 1 : 8
     let readers = singleReader ? 1 : 8
