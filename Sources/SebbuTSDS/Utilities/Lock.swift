@@ -8,7 +8,7 @@
 import Synchronization
 /// Lock object. This is basically a wrapper around the standard library Mutex
 @available(*, deprecated, message: "Use the standard library Mutex type instead.")
-public struct Lock: ~Copyable, Sendable {
+public final class Lock: Sendable {
     @usableFromInline
     internal let _lock: Mutex<Void> = Mutex(())
     
