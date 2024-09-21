@@ -13,20 +13,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-         - tag: 5.7.3-RELEASE
-           branch: swift-5.7.3-release
-         - tag: 5.8.1-RELEASE
-           branch: swift-5.8.1-release
-           #TODO: Add 5.9-RELEASE
-         - tag: DEVELOPMENT-SNAPSHOT-2023-07-10-a
-           branch: development
+         - tag: 6.0-RELEASE
+           branch: swift-6.0-release
+         #- tag: DEVELOPMENT-SNAPSHOT-2024-07-10-a
+         #  branch: development
            
     steps:
     - uses: compnerd/gha-setup-swift@main
       with:
         branch: ${{ matrix.branch }}
         tag: ${{ matrix.tag }}
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Swift Version
       run: swift --version
