@@ -69,7 +69,6 @@ public final class MPSCQueue<Element: ~Copyable>: @unchecked Sendable {
             return nil
         }
         let result = next.pointee.data.take()
-        next.pointee.data = nil
         head.store(next, ordering: .releasing)
         if !cache.enqueue(currentHead) {
             currentHead.deinitialize(count: 1)

@@ -6,10 +6,6 @@
 //
 
 //TODO: Add the Foundation specific utilities to a different package so that the SebbuTSDS has no Foundation dependency
-#if canImport(Atomics)
-import Atomics
-#endif
-import Foundation
 import CSebbuTSDS
 #if canImport(Darwin)
 import Darwin
@@ -38,23 +34,14 @@ internal func debugOnly(_ body: () -> Void) {
     assert({ body(); return true}())
 }
 
-public extension NSLock {
-    @inline(__always)
-    final func withLock<T>(_ block: () throws -> T) rethrows -> T {
-        lock(); defer { unlock() }
-        return try block()
-    }
-}
-
-extension NSLock: @unchecked Sendable {}
-
 public enum HardwareUtilities {
     /// Issues a hardware pause
-    /// On x86/x64 this is the PAUSE instruction, on ARM this is yield, othewise its a no-op
+    /// On x86/x64 this is the PAUSE instruction, on ARM this is wfe, othewise its a no-op
     @inline(__always)
     @_transparent
     public static func pause() {
-        _hardware_pause()
+        //_hardware_pause()
+        _hardwarePause()
     }
     
     @inlinable
@@ -87,16 +74,14 @@ public enum HardwareUtilities {
     }
 }
 
-#if canImport(Atomics)
-extension UnsafeAtomic {
-    @inlinable
-    public static func createCacheAligned(_ initialValue: Value) -> Self {
-        let byteCount = MemoryLayout<Value.AtomicRepresentation>.size
-        let alignment = HardwareUtilities.cacheLineSize()
-        let rawPtr = UnsafeMutableRawPointer.allocate(byteCount: byteCount, alignment: alignment)
-        let ptr = rawPtr.assumingMemoryBound(to: Value.AtomicRepresentation.self)
-        ptr.initialize(to: Value.AtomicRepresentation(initialValue))
-        return Self(at: ptr)
-    }
-}
-#endif
+//extension UnsafeAtomic {
+//    @inlinable
+//    public static func createCacheAligned(_ initialValue: Value) -> Self {
+//        let byteCount = MemoryLayout<Value.AtomicRepresentation>.size
+//        let alignment = HardwareUtilities.cacheLineSize()
+//        let rawPtr = UnsafeMutableRawPointer.allocate(byteCount: byteCount, alignment: alignment)
+//        let ptr = rawPtr.assumingMemoryBound(to: Value.AtomicRepresentation.self)
+//        ptr.initialize(to: Value.AtomicRepresentation(initialValue))
+//        return Self(at: ptr)
+//    }
+//}

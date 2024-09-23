@@ -11,21 +11,18 @@ let package = Package(
             targets: ["SebbuTSDS"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.1.0"),
-        //TODO: Use a version that includes HeapModule
-        .package(url: "https://github.com/apple/swift-collections.git", branch: "main")
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0")
     ],
     targets: [
         .target(
             name: "SebbuTSDS",
-            dependencies: [.product(name: "Atomics", package: "swift-atomics"),
-                           .product(name: "DequeModule", package: "swift-collections"),
+            dependencies: [.product(name: "DequeModule", package: "swift-collections"),
                            .product(name: "HeapModule", package: "swift-collections"),
-                           "CSebbuTSDS"]),
+                           "CSebbuTSDS"],
+            swiftSettings: [.enableExperimentalFeature("Extern")]),
         .target(name: "CSebbuTSDS"),
         .testTarget(
             name: "SebbuTSDSTests",
-            dependencies: ["SebbuTSDS",
-                           .product(name: "Atomics", package: "swift-atomics")]),
+            dependencies: ["SebbuTSDS"]),
     ]
 )
