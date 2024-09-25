@@ -11,6 +11,8 @@ import CSebbuTSDS
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
 #elseif canImport(WinSDK)
 import WinSDK
 #else
@@ -52,6 +54,8 @@ public enum HardwareUtilities {
         sysctlbyname("hw.cachelinesize", &lineSize, &sizeOfLineSize, nil, 0)
         #elseif canImport(Glibc)
         lineSize = sysconf(Int32(_SC_LEVEL1_DCACHE_LINESIZE))
+        #elseif canImport(Musl)
+        #warning("FIXME: Assuming common cacheline size of 64 on Musl")
         #elseif canImport(WinSDK)
         var bufferSize: DWORD = 0
         GetLogicalProcessorInformation(nil, &bufferSize)
