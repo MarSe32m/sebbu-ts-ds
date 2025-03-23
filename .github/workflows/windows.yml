@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-         - tag: 6.0-RELEASE
-           branch: swift-6.0-release
+         - tag: 6.0.3-RELEASE
+           branch: swift-6.0.3-release
          #- tag: DEVELOPMENT-SNAPSHOT-2024-07-10-a
          #  branch: development
            
