@@ -8,7 +8,6 @@
 // Spinlocking is extremely bad on iOS, tvOS and watchOS, so for them we will use the Mutex primitive
 #if !(os(iOS) || os(tvOS) || os(watchOS))
 import Synchronization
-import CSebbuTSDS
 
 public struct Spinlock: ~Copyable, @unchecked Sendable {
     @usableFromInline

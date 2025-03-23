@@ -17,10 +17,9 @@ let package = Package(
         .target(
             name: "SebbuTSDS",
             dependencies: [.product(name: "DequeModule", package: "swift-collections"),
-                           .product(name: "HeapModule", package: "swift-collections"),
-                           "CSebbuTSDS"],
-            swiftSettings: [.enableExperimentalFeature("Extern")]),
-        .target(name: "CSebbuTSDS"),
+                           .product(name: "HeapModule", package: "swift-collections")],
+            swiftSettings: [.enableExperimentalFeature("Extern"),
+                            .enableExperimentalFeature("BuiltinModule")]),
         .testTarget(
             name: "SebbuTSDSTests",
             dependencies: ["SebbuTSDS"]),

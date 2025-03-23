@@ -13,7 +13,7 @@ public protocol ConcurrentQueue {
     var wasFull: Bool { get }
     
     /// Enqueues an item to the queue
-    /// - returns Boolean value based on if the item was enqueued successfully
+    /// - returns The value back if it wasn't possible to be enqueued
     @inlinable
     func enqueue(_ value: consuming Element) -> Element?
     

@@ -6,7 +6,6 @@
 //
 
 //TODO: Add the Foundation specific utilities to a different package so that the SebbuTSDS has no Foundation dependency
-import CSebbuTSDS
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -42,7 +41,6 @@ public enum HardwareUtilities {
     @inline(__always)
     @_transparent
     public static func pause() {
-        //_hardware_pause()
         _hardwarePause()
     }
     
