@@ -49,7 +49,7 @@ public final class LockedQueue<Element: ~Copyable>: @unchecked Sendable {
 
     /// Enqueues an item at the end of the queue
     @inline(__always)
-    public func enqueue(_ value: consuming Element) -> Element? {
+    public func enqueue(_ value: consuming sending Element) -> Element? {
         lock._unsafeLock(); defer { lock._unsafeUnlock() }
         _enqueue(value)
         return nil
@@ -57,7 +57,7 @@ public final class LockedQueue<Element: ~Copyable>: @unchecked Sendable {
     
     @inline(__always)
     @inlinable
-    internal func _enqueue(_ value: consuming Element) {
+    internal func _enqueue(_ value: consuming sending Element) {
         if (writeIndex + 1) % buffer.count == readIndex { _grow() }
         buffer.initializeElement(at: writeIndex, to: value)
         //TODO: Is this modulo a noticable performance penalty?
@@ -66,14 +66,14 @@ public final class LockedQueue<Element: ~Copyable>: @unchecked Sendable {
 
     /// Dequeues the next element in the queue if there are any
     @inline(__always)
-    public func dequeue() -> Element? {
+    public func dequeue() -> sending Element? {
         lock._unsafeLock(); defer { lock._unsafeUnlock() }
         return _dequeue()
     }
     
     @inline(__always)
     @inlinable
-    internal func _dequeue() -> Element? {
+    internal func _dequeue() -> sending Element? {
         if readIndex == writeIndex { return nil }
         let element = buffer.moveElement(from: readIndex)
         readIndex = (readIndex + 1) % buffer.count
@@ -82,7 +82,7 @@ public final class LockedQueue<Element: ~Copyable>: @unchecked Sendable {
 
     /// Dequeues all of the elements
     @inline(__always)
-    public func dequeueAll(_ closure: (consuming Element) -> Void) {
+    public func dequeueAll(_ closure: (consuming sending Element) -> Void) {
         while let element = dequeue() {
             closure(element)
         }

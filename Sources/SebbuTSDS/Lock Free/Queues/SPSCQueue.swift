@@ -53,7 +53,7 @@ public final class SPSCQueue<Element: ~Copyable>: @unchecked Sendable {
     }
     
     @inlinable
-    public final func enqueue(_ value: consuming Element) -> Element? {
+    public final func enqueue(_ value: consuming sending Element) -> Element? {
         let node = allocateNode(value)
         atomicMemoryFence(ordering: .acquiringAndReleasing)
         tail.pointee.next = node
@@ -62,7 +62,7 @@ public final class SPSCQueue<Element: ~Copyable>: @unchecked Sendable {
     }
     
     @inlinable
-    public final func dequeue() -> Element? {
+    public final func dequeue() -> sending Element? {
         atomicMemoryFence(ordering: .acquiring)
         // Thread sanitizer will throw a data race here...
         if head.pointee.next == nil {
@@ -89,7 +89,7 @@ public final class SPSCQueue<Element: ~Copyable>: @unchecked Sendable {
     }
     
     @inline(__always)
-    public final func dequeueAll(_ closure: (consuming Element) -> Void) {
+    public final func dequeueAll(_ closure: (consuming sending Element) -> Void) {
         while let element = dequeue() {
             closure(element)
         }

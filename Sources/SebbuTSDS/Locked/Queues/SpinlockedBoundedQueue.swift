@@ -52,13 +52,13 @@ public final class SpinlockedBoundedQueue<Element: ~Copyable>: @unchecked Sendab
     
     /// Enqueues an item at the end of the queue
     @discardableResult
-    public func enqueue(_ value: consuming Element) -> Element? {
+    public func enqueue(_ value: consuming sending Element) -> Element? {
         lock.lock(); defer { lock.unlock() }
         return _enqueue(value)
     }
     
     @inline(__always)
-    internal func _enqueue(_ value: consuming Element) -> Element? {
+    internal func _enqueue(_ value: consuming sending Element) -> Element? {
         if (tailIndex + 1) & self.mask == headIndex {
             return value
         }
@@ -68,14 +68,14 @@ public final class SpinlockedBoundedQueue<Element: ~Copyable>: @unchecked Sendab
     }
     
     /// Dequeues the next element in the queue if there are any
-    public func dequeue() -> Element? {
+    public func dequeue() -> sending Element? {
         lock.lock(); defer { lock.unlock() }
         return _dequeue()
     }
     
     @inline(__always)
     @usableFromInline
-    internal func _dequeue() -> Element? {
+    internal func _dequeue() -> sending Element? {
         if headIndex == tailIndex { return nil }
         let result = buffer.moveElement(from: headIndex)
         headIndex = (headIndex + 1) & self.mask
@@ -84,7 +84,7 @@ public final class SpinlockedBoundedQueue<Element: ~Copyable>: @unchecked Sendab
     
     /// Dequeues all of the elements
     @inline(__always)
-    public func dequeueAll(_ closure: (consuming Element) -> Void) {
+    public func dequeueAll(_ closure: (consuming sending Element) -> Void) {
         while let element = dequeue() {
             closure(element)
         }

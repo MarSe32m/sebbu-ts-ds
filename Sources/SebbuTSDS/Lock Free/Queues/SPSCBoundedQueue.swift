@@ -57,7 +57,7 @@ public final class SPSCBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     
     @discardableResult
     @inlinable
-    public final func enqueue(_ value: consuming Element) -> Element? {
+    public final func enqueue(_ value: consuming sending Element) -> Element? {
         let pos = tail.load(ordering: .relaxed)
         let nextPos = pos + 1
         if (headCached - nextPos) & mask < 1 {
@@ -72,7 +72,7 @@ public final class SPSCBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     }
     
     @inlinable
-    public final func dequeue() -> Element? {
+    public final func dequeue() -> sending Element? {
         let pos = head.load(ordering: .relaxed)
         if (tailCached - pos) & mask < 1 {
             tailCached = tail.load(ordering: .acquiring)
@@ -86,7 +86,7 @@ public final class SPSCBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     }
     
     @inline(__always)
-    public final func dequeueAll(_ closure: (consuming Element) -> Void) {
+    public final func dequeueAll(_ closure: (consuming sending Element) -> Void) {
         while let element = dequeue() {
             closure(element)
         }

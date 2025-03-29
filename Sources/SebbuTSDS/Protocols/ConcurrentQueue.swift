@@ -15,15 +15,15 @@ public protocol ConcurrentQueue {
     /// Enqueues an item to the queue
     /// - returns The value back if it wasn't possible to be enqueued
     @inlinable
-    func enqueue(_ value: consuming Element) -> Element?
+    func enqueue(_ value: consuming sending Element) -> Element?
     
     /// Dequeues the next element in the queue if there are any
     @inlinable
-    func dequeue() -> Element?
+    func dequeue() -> sending Element?
     
     /// Dequeues all of the items from the queue
     @inline(__always)
-    func dequeueAll(_ closure: (consuming Element) -> Void)
+    func dequeueAll(_ closure: (consuming sending Element) -> Void)
 }
 
 // Extensions for Copyable elements
@@ -32,12 +32,12 @@ public extension ConcurrentQueue {
     func enqueue(_ value: Element) -> Bool { enqueue(value) == nil }
 
     @inlinable
-    func blockingEnqueue(_ value: consuming Element) {
+    func blockingEnqueue(_ value: consuming sending Element) {
         while !enqueue(value) {}
     }
     
     @inlinable
-    func blockingDequeue() -> Element {
+    func blockingDequeue() -> sending Element {
         while true {
             if let value = dequeue() {
                 return value

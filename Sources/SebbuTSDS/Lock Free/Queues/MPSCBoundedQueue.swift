@@ -84,7 +84,7 @@ public final class MPSCBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     
     @discardableResult
     @inlinable
-    public final func enqueue(_ value: consuming Element) -> Element? {
+    public final func enqueue(_ value: consuming sending Element) -> Element? {
         var node: UnsafeMutablePointer<BufferNode>!
         var pos = tail.load(ordering: .relaxed)
         
@@ -113,7 +113,7 @@ public final class MPSCBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     }
     
     @inlinable
-    public final func dequeue() -> Element? {
+    public final func dequeue() -> sending Element? {
         let pos = head
         let node: UnsafeMutablePointer<BufferNode> = _buffer.baseAddress!.advanced(by: pos & mask)
         let seq = node.pointee.sequence.load(ordering: .acquiring)
@@ -129,7 +129,7 @@ public final class MPSCBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     }
     
     @inline(__always)
-    public final func dequeueAll(_ closure: (consuming Element) -> Void) {
+    public final func dequeueAll(_ closure: (consuming sending Element) -> Void) {
         while let element = dequeue() {
             closure(element)
         }

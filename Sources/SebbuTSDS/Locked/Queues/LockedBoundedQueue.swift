@@ -51,13 +51,13 @@ public final class LockedBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     
     /// Enqueues an item at the end of the queue
     @discardableResult
-    public func enqueue(_ value: consuming Element) -> Element? {
+    public func enqueue(_ value: consuming sending Element) -> Element? {
         lock._unsafeLock(); defer { lock._unsafeUnlock() }
         return _enqueue(value)
     }
     
     @inline(__always)
-    internal func _enqueue(_ value: consuming Element) -> Element? {
+    internal func _enqueue(_ value: consuming sending Element) -> Element? {
         if (tailIndex + 1) & self.mask == headIndex {
             return value
         }
@@ -67,7 +67,7 @@ public final class LockedBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     }
     
     /// Dequeues the next element in the queue if there are any
-    public func dequeue() -> Element? {
+    public func dequeue() -> sending Element? {
         lock._unsafeLock(); defer { lock._unsafeUnlock() }
         return _dequeue()
     }
@@ -83,7 +83,7 @@ public final class LockedBoundedQueue<Element: ~Copyable>: @unchecked Sendable {
     
     /// Dequeues all of the elements
     @inline(__always)
-    public func dequeueAll(_ closure: (consuming Element) -> Void) {
+    public func dequeueAll(_ closure: (consuming sending Element) -> Void) {
         while let element = dequeue() {
             closure(element)
         }
